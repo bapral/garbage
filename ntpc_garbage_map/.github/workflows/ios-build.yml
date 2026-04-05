@@ -1,0 +1,37 @@
+name: iOS Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    name: Build iOS App
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          flutter-version: '3.41.6' # 匹配你目前的版本
+
+      - name: Install dependencies
+        run: |
+          cd ntpc_garbage_map
+          flutter pub get
+
+      - name: Build iOS (No Signing)
+        run: |
+          cd ntpc_garbage_map
+          flutter build ios --release --no-codesign
+
+      - name: Upload iOS Build Product
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: ntpc_garbage_map/build/ios/iphoneos/Runner.app
