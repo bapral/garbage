@@ -5,7 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # 新增：手動啟動按鈕
+  workflow_dispatch:
 
 jobs:
   build:
@@ -19,7 +19,8 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.41.6' # 匹配你目前的版本
+          flutter-version: '3.41.6'
+          cache: true # 開啟快取以加速後續編譯
 
       - name: Install dependencies
         run: flutter pub get
@@ -27,8 +28,10 @@ jobs:
       - name: Build iOS (No Signing)
         run: flutter build ios --release --no-codesign
 
-      - name: Upload iOS Build Product
+      # 將編譯產物打包
+      - name: Upload iOS App
         uses: actions/upload-artifact@v4
         with:
-          name: ios-build
+          name: ios-runner-app
           path: build/ios/iphoneos/Runner.app
+          retention-days: 7
