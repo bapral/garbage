@@ -10,6 +10,7 @@ import 'package:latlong2/latlong.dart';
 class MockGarbageTrucksNotifier extends GarbageTrucksNotifier {
   @override
   List<GarbageTruck> build() {
+    Future.microtask(() => ref.read(isSyncingProvider.notifier).setSyncing(false));
     return [
       GarbageTruck(
         carNumber: 'TEST-001',
@@ -37,13 +38,13 @@ void main() {
     await tester.pump();
 
     // 1. 檢查是否有「預測按鈕」(時鐘圖示)
-    expect(find.byIcon(Icons.timer), findsOneWidget);
+    expect(find.byTooltip('選擇預測模式'), findsOneWidget);
 
     // 2. 檢查是否有「尋找最近按鈕」(near_me 圖示)
     expect(find.byIcon(Icons.near_me), findsOneWidget);
 
     // 3. 測試點擊預測按鈕彈出選單，再點擊第一個 ListTile
-    await tester.tap(find.byIcon(Icons.timer));
+    await tester.tap(find.byTooltip('選擇預測模式'));
     await tester.pumpAndSettle();
     expect(find.text('預測功能選擇'), findsOneWidget);
     

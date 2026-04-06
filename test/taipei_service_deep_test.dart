@@ -19,9 +19,11 @@ void main() {
 
     setUp(() async {
       dbService = DatabaseService();
+      DatabaseService.customPath = inMemoryDatabasePath;
       // 清空資料庫
       final db = await dbService.db;
       await db.delete(DatabaseService.tableName);
+      await db.delete(DatabaseService.metaTable);
 
       // 建立臨時目錄存放測試 CSV
       tempDir = await Directory.systemTemp.createTemp('taipei_test');
@@ -61,7 +63,7 @@ void main() {
       expect(count, equals(2));
 
       // 搜尋 16:30 的點
-      final pointsAt1630 = await dbService.findPointsByTime(16, 30);
+      final pointsAt1630 = await dbService.findPointsByTime(16, 30, 'taipei');
       expect(pointsAt1630.length, equals(1));
       expect(pointsAt1630.first.name, contains('天母西路48號'));
       expect(pointsAt1630.first.arrivalTime, equals('16:30'));
@@ -69,7 +71,7 @@ void main() {
       expect(pointsAt1630.first.position.longitude, equals(121.525));
 
       // 搜尋 17:00 的點 (應該搜尋到 17:05 的)
-      final pointsAt1700 = await dbService.findPointsByTime(17, 0);
+      final pointsAt1700 = await dbService.findPointsByTime(17, 0, 'taipei');
       expect(pointsAt1700.length, equals(1));
       expect(pointsAt1700.first.arrivalTime, equals('17:05'));
     });

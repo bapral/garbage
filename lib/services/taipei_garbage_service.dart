@@ -244,7 +244,7 @@ class TaipeiGarbageService extends BaseGarbageService {
 
       return GarbageTruck(
         carNumber: '預定車',
-        lineId: '台北 - ${p.lineId}',
+        lineId: p.lineId, 
         location: '${p.lineName} - ${p.name}',
         position: p.position,
         updateTime: scheduledTime,

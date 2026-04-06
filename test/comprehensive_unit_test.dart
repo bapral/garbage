@@ -40,10 +40,10 @@ void main() {
     test('DatabaseService.findPointsByTime handles 15-min offset window', () async {
       await dbService.saveRoutePoints([
         GarbageRoutePoint(lineId: '1', lineName: 'R1', rank: 1, name: 'Target', position: LatLng(25, 121), arrivalTime: '20:40'),
-      ]);
+      ], 'ntpc');
 
       // 搜尋 20:30 (應能搜到 20:15~20:45 之間的 20:40)
-      final results = await dbService.findPointsByTime(20, 30);
+      final results = await dbService.findPointsByTime(20, 30, 'ntpc');
       expect(results.length, equals(1));
       expect(results.first.name, equals('Target'));
     });

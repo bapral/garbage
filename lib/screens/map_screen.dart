@@ -292,10 +292,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
                 MarkerLayer(
                   markers: trucks.map((truck) {
-                    // 更準確的城市判斷：檢查 lineId 是否包含台北，或者目前的城市配置是否為台北且該車輛不是來自新北
-                    final bool isTaipei = truck.lineId.contains('台北') || (config.cityName == 'taipei' && !truck.lineId.contains('新北'));
-                    final Color cityColor = isTaipei ? Colors.blue[700]! : Colors.orange[800]!;
-                    final String cityShort = isTaipei ? '北' : '新';
+                    // 根據 lineId 或當前配置決定顏色與標籤
+                    Color cityColor;
+                    String cityShort;
+                    
+                    if (truck.lineId.contains('台北')) {
+                      cityColor = Colors.blue[700]!;
+                      cityShort = '北';
+                    } else if (truck.lineId.contains('台中') || (config.cityName == 'taichung' && !truck.lineId.contains('新北') && !truck.lineId.contains('台北'))) {
+                      cityColor = Colors.green[700]!;
+                      cityShort = '中';
+                    } else {
+                      cityColor = Colors.orange[800]!;
+                      cityShort = '新';
+                    }
                     
                     return Marker(
                       point: truck.position,
@@ -506,6 +516,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 title: const Text('新北市'),
                 onTap: () {
                   ref.read(citySelectionProvider.notifier).setCity('ntpc');
+                  Navigator.pop(context);
+                  _onCityChanged();
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.map, color: Colors.green),
+                title: const Text('台中市'),
+                onTap: () {
+                  ref.read(citySelectionProvider.notifier).setCity('taichung');
                   Navigator.pop(context);
                   _onCityChanged();
                 },

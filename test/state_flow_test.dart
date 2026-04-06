@@ -42,12 +42,13 @@ void main() {
       );
       
       // 監聽 Provider 以確保它被初始化
+      container.listen(garbageTrucksProvider, (p, n) {});
       container.listen(isSyncingProvider, (p, n) {});
 
       // 等待狀態改變
       bool success = false;
-      for(int i=0; i<20; i++) {
-        await Future.delayed(const Duration(milliseconds: 50));
+      for(int i=0; i<30; i++) {
+        await Future.delayed(const Duration(milliseconds: 100));
         if (container.read(isSyncingProvider) == false) {
           success = true;
           break;

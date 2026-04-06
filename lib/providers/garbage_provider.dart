@@ -7,6 +7,7 @@ import '../models/garbage_route_point.dart';
 import '../models/city_config.dart';
 import '../services/ntpc_garbage_service.dart';
 import '../services/taipei_garbage_service.dart';
+import '../services/taichung_garbage_service.dart';
 import '../services/database_service.dart';
 
 // 目前城市選擇
@@ -23,6 +24,8 @@ final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
   final config = ref.watch(currentCityConfigProvider);
   if (config.cityName == 'taipei') {
     return TaipeiGarbageService(localSourceDir: config.localSourceDir);
+  } else if (config.cityName == 'taichung') {
+    return TaichungGarbageService(localSourceDir: config.localSourceDir);
   }
   return NtpcGarbageService(localSourceDir: config.localSourceDir);
 });
@@ -46,6 +49,14 @@ final currentCityConfigProvider = Provider<CityConfig>((ref) {
       initialCenter: const LatLng(25.0330, 121.5654),
       themeColor: Colors.blue,
       localSourceDir: r'D:\CLI\garbage\台北市垃圾車路線',
+    );
+  } else if (city == 'taichung') {
+    return CityConfig(
+      cityName: 'taichung',
+      appTitle: '台中市垃圾車即時地圖',
+      initialCenter: const LatLng(24.1477, 120.6736),
+      themeColor: Colors.green,
+      localSourceDir: r'D:\CLI\garbage\臺中市定時定點垃圾收運地點',
     );
   }
   return CityConfig(

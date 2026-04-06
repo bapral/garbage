@@ -47,7 +47,7 @@ void main() {
     expect(find.textContaining('新北市'), findsOneWidget);
 
     // 2. 測試 Marker 資訊卡與 SelectableText
-    await tester.tap(find.byIcon(Icons.local_shipping));
+    await tester.tap(find.byIcon(Icons.local_shipping_rounded));
     await tester.pumpAndSettle();
     expect(find.byType(SelectableText), findsAtLeast(3));
     expect(find.text('TEST-123'), findsOneWidget);

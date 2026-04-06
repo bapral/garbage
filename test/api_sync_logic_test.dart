@@ -64,7 +64,7 @@ void main() {
     test('Taipei: Should NOT update database when API returns only 1000 records (Threshold Fail)', () async {
       await dbService.saveRoutePoints([
         GarbageRoutePoint(lineId: 'OLD', lineName: 'OLD', rank: 1, name: 'OLD', position: LatLng(0,0), arrivalTime: '00:00')
-      ]);
+      ], 'taipei');
 
       final mockClient = MockClient((request) async {
         return http.Response(

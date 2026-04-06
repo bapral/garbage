@@ -28,10 +28,10 @@ void main() {
         GarbageRoutePoint(lineId: 'L2', lineName: 'Route 2', rank: 1, name: 'Morning St', position: LatLng(25.2, 121.2), arrivalTime: '08:30'),
       ];
 
-      await dbService.saveRoutePoints(mockPoints);
+      await dbService.saveRoutePoints(mockPoints, 'ntpc');
 
       // 搜尋 20:30 左右的點 (區間為 20:15 - 20:45)
-      final results = await dbService.findPointsByTime(20, 30);
+      final results = await dbService.findPointsByTime(20, 30, 'ntpc');
       
       expect(results.length, equals(2));
       expect(results.any((p) => p.name == 'Central 8th St'), isTrue);
@@ -44,10 +44,10 @@ void main() {
         GarbageRoutePoint(lineId: 'L1', lineName: 'Route 1', rank: 2, name: 'Point B', position: LatLng(25.1, 121.1), arrivalTime: '20:38'),
       ];
 
-      await dbService.saveRoutePoints(mockPoints);
+      await dbService.saveRoutePoints(mockPoints, 'ntpc');
 
       // 搜尋 20:30 (預期會搜到 20:3X)
-      final results = await dbService.findPointsByTime(20, 30);
+      final results = await dbService.findPointsByTime(20, 30, 'ntpc');
       
       expect(results.length, equals(2));
     });
