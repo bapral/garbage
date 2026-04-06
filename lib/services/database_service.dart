@@ -6,9 +6,24 @@ import '../models/garbage_route_point.dart';
 import 'package:latlong2/latlong.dart';
 
 class DatabaseService {
+  static final DatabaseService _instance = DatabaseService._internal();
+  factory DatabaseService() => _instance;
+  DatabaseService._internal();
+
   static Database? _db;
   static const String tableName = 'route_points';
   static const String metaTable = 'metadata';
+
+  // 日誌記錄
+  static Future<void> log(String message) async {
+    final now = DateTime.now();
+    final logStr = '[$now] $message\n';
+    print(logStr);
+    try {
+      final file = File(r'C:\Users\bapral\AppData\Local\garbage_map_debug.log');
+      await file.writeAsString(logStr, mode: FileMode.append);
+    } catch (_) {}
+  }
 
   Future<Database> get db async {
     if (_db != null) return _db!;
@@ -21,29 +36,13 @@ class DatabaseService {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }
-
-    final String path = join(await getDatabasesPath(), 'garbage_map_v2.db');
+    final String path = join(await getDatabasesPath(), 'garbage_map_v3.db');
     return await openDatabase(
       path,
       version: 1,
       onCreate: (db, version) async {
-        await db.execute('''
-          CREATE TABLE $tableName (
-            lineId TEXT,
-            lineName TEXT,
-            rank INTEGER,
-            name TEXT,
-            latitude REAL,
-            longitude REAL,
-            arrivalTime TEXT
-          )
-        ''');
-        await db.execute('''
-          CREATE TABLE $metaTable (
-            key TEXT PRIMARY KEY,
-            value TEXT
-          )
-        ''');
+        await db.execute('CREATE TABLE $tableName (lineId TEXT, lineName TEXT, rank INTEGER, name TEXT, latitude REAL, longitude REAL, arrivalTime TEXT)');
+        await db.execute('CREATE TABLE $metaTable (key TEXT PRIMARY KEY, value TEXT)');
         await db.execute('CREATE INDEX idx_lineId ON $tableName (lineId)');
         await db.execute('CREATE INDEX idx_time ON $tableName (arrivalTime)');
       },
@@ -52,22 +51,13 @@ class DatabaseService {
 
   Future<String?> getStoredVersion() async {
     final database = await db;
-    final List<Map<String, dynamic>> maps = await database.query(
-      metaTable,
-      where: 'key = ?',
-      whereArgs: ['app_version'],
-    );
-    if (maps.isNotEmpty) return maps.first['value'];
-    return null;
+    final List<Map<String, dynamic>> maps = await database.query(metaTable, where: 'key = ?', whereArgs: ['app_version']);
+    return maps.isNotEmpty ? maps.first['value'] : null;
   }
 
   Future<void> updateVersion(String version) async {
     final database = await db;
-    await database.insert(
-      metaTable,
-      {'key': 'app_version', 'value': version},
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await database.insert(metaTable, {'key': 'app_version', 'value': version}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> clearAllRoutePoints() async {
@@ -77,78 +67,48 @@ class DatabaseService {
 
   Future<void> saveRoutePoints(List<GarbageRoutePoint> points) async {
     final database = await db;
-    final batch = database.batch();
-    for (var p in points) {
-      batch.insert(tableName, {
-        'lineId': p.lineId,
-        'lineName': p.lineName,
-        'rank': p.rank,
-        'name': p.name,
-        'latitude': p.position.latitude,
-        'longitude': p.position.longitude,
-        'arrivalTime': p.arrivalTime,
-      });
-    }
-    await batch.commit(noResult: true);
+    await database.transaction((txn) async {
+      final batch = txn.batch();
+      for (var p in points) {
+        batch.insert(tableName, {
+          'lineId': p.lineId, 'lineName': p.lineName, 'rank': p.rank, 'name': p.name,
+          'latitude': p.position.latitude, 'longitude': p.position.longitude, 'arrivalTime': p.arrivalTime,
+        });
+      }
+      await batch.commit(noResult: true);
+    });
   }
 
   Future<int> getTotalCount() async {
     final database = await db;
-    final count = Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM $tableName'));
-    return count ?? 0;
+    return Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM $tableName')) ?? 0;
   }
 
-  Future<bool> hasData() async {
-    return (await getTotalCount()) > 0;
-  }
+  Future<bool> hasData() async => (await getTotalCount()) > 0;
 
   Future<List<GarbageRoutePoint>> findPointsByTime(int hour, int minute) async {
     final database = await db;
-    final String timeStr = '${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}';
-    
-    final List<Map<String, dynamic>> maps = await database.query(
-      tableName,
-      where: "arrivalTime >= ? AND arrivalTime <= ?",
-      whereArgs: [
-        _offsetTime(hour, minute, -15),
-        _offsetTime(hour, minute, 15),
-      ],
-    );
-
-    return List.generate(maps.length, (i) {
-      return GarbageRoutePoint(
-        lineId: maps[i]['lineId'] ?? '',
-        lineName: maps[i]['lineName'] ?? '',
-        rank: maps[i]['rank'] ?? 0,
-        name: maps[i]['name'] ?? '',
-        position: LatLng(maps[i]['latitude'] ?? 0, maps[i]['longitude'] ?? 0),
-        arrivalTime: maps[i]['arrivalTime'] ?? '',
-      );
-    });
+    final String start = _offsetTime(hour, minute, -15);
+    final String end = _offsetTime(hour, minute, 15);
+    final List<Map<String, dynamic>> maps = await database.query(tableName, where: "arrivalTime >= ? AND arrivalTime <= ?", whereArgs: [start, end]);
+    return maps.map((m) => GarbageRoutePoint(
+      lineId: m['lineId'] ?? '', lineName: m['lineName'] ?? '', rank: m['rank'] ?? 0, name: m['name'] ?? '',
+      position: LatLng(m['latitude'] ?? 0, m['longitude'] ?? 0), arrivalTime: m['arrivalTime'] ?? '',
+    )).toList();
   }
 
   String _offsetTime(int h, int m, int offset) {
     int total = h * 60 + m + offset;
-    if (total < 0) total = 0;
-    if (total > 1439) total = 1439;
+    if (total < 0) total = 0; if (total > 1439) total = 1439;
     return '${(total ~/ 60).toString().padLeft(2, '0')}:${(total % 60).toString().padLeft(2, '0')}';
   }
 
   Future<List<GarbageRoutePoint>> getRoutePoints(String lineId) async {
     final database = await db;
-    final List<Map<String, dynamic>> maps = await database.query(
-      tableName,
-      where: 'lineId = ?',
-      whereArgs: [lineId],
-      orderBy: 'rank ASC',
-    );
+    final List<Map<String, dynamic>> maps = await database.query(tableName, where: 'lineId = ?', whereArgs: [lineId], orderBy: 'rank ASC');
     return maps.map((m) => GarbageRoutePoint(
-      lineId: m['lineId'],
-      lineName: m['lineName'],
-      rank: m['rank'],
-      name: m['name'],
-      position: LatLng(m['latitude'], m['longitude']),
-      arrivalTime: m['arrivalTime'],
+      lineId: m['lineId'], lineName: m['lineName'], rank: m['rank'], name: m['name'],
+      position: LatLng(m['latitude'], m['longitude']), arrivalTime: m['arrivalTime'],
     )).toList();
   }
 }

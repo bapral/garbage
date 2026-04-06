@@ -8,7 +8,22 @@ import '../models/city_config.dart';
 import '../services/ntpc_garbage_service.dart';
 import '../services/database_service.dart';
 
-// 目前城市配置 Provider (預設為新北)
+// 全域服務 Provider
+final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
+  final config = ref.watch(currentCityConfigProvider);
+  return NtpcGarbageService(localSourceDir: config.localSourceDir);
+});
+
+// 目前顯示來源與筆數 Provider
+final sourceInfoProvider = NotifierProvider<SourceInfoNotifier, String>(SourceInfoNotifier.new);
+
+class SourceInfoNotifier extends Notifier<String> {
+  @override
+  String build() => '載入中...';
+  void setInfo(String msg) => state = msg;
+}
+
+// 目前城市配置
 final currentCityConfigProvider = Provider<CityConfig>((ref) => CityConfig(
   cityName: 'ntpc',
   appTitle: '新北市垃圾車即時地圖',
@@ -16,13 +31,6 @@ final currentCityConfigProvider = Provider<CityConfig>((ref) => CityConfig(
   themeColor: Colors.yellow,
   localSourceDir: r'D:\CLI\garbage\新北市垃圾車路線',
 ));
-
-// 全域服務 Provider (改為抽象型別 BaseGarbageService)
-final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
-  final config = ref.watch(currentCityConfigProvider);
-  // 未來可以在此根據 config.cityName 返回不同的實作類別 (例如 TaipeiGarbageService)
-  return NtpcGarbageService(localSourceDir: config.localSourceDir);
-});
 
 // 位置模式 (自動/手動)
 enum LocationMode { auto, manual }
@@ -43,7 +51,7 @@ class ManualPositionNotifier extends Notifier<LatLng?> {
   void setPosition(LatLng? pos) => state = pos;
 }
 
-// 資料庫總筆數 Provider
+// 資料庫快取總筆數
 final routeDataCountProvider = NotifierProvider<RouteDataCountNotifier, int>(RouteDataCountNotifier.new);
 
 class RouteDataCountNotifier extends Notifier<int> {
@@ -61,7 +69,7 @@ class SyncStatusNotifier extends Notifier<bool> {
   void setSyncing(bool value) => state = value;
 }
 
-// 同步進度文字 Provider
+// 同步進度文字
 final syncProgressProvider = NotifierProvider<SyncProgressNotifier, String>(SyncProgressNotifier.new);
 
 class SyncProgressNotifier extends Notifier<String> {
@@ -70,7 +78,7 @@ class SyncProgressNotifier extends Notifier<String> {
   void setProgress(String msg) => state = msg;
 }
 
-// 目標預測時間 Provider (絕對時間)
+// 目標預測時間
 final targetTimeProvider = NotifierProvider<TargetTimeNotifier, DateTime?>(TargetTimeNotifier.new);
 
 class TargetTimeNotifier extends Notifier<DateTime?> {
@@ -80,7 +88,7 @@ class TargetTimeNotifier extends Notifier<DateTime?> {
   void reset() => state = null;
 }
 
-// 預測時間偏移 Provider (相對時間)
+// 預測時間偏移
 final predictionDurationProvider = NotifierProvider<PredictionDurationNotifier, Duration>(PredictionDurationNotifier.new);
 
 class PredictionDurationNotifier extends Notifier<Duration> {
@@ -100,16 +108,29 @@ final predictedTrucksProvider = FutureProvider<List<GarbageTruck>>((ref) async {
   final targetTime = ref.watch(targetTimeProvider);
   final service = ref.read(garbageServiceProvider);
   
+  List<GarbageTruck> result;
+  String sourceLabel = '';
+
   if (targetTime != null) {
-    return await service.findTrucksByTime(targetTime.hour, targetTime.minute);
-  }
-
-  if (duration != Duration.zero) {
+    result = await service.findTrucksByTime(targetTime.hour, targetTime.minute);
+    sourceLabel = '資料來源: 資料庫 (指定時間)';
+  } else if (duration != Duration.zero) {
     final target = DateTime.now().add(duration);
-    return await service.findTrucksByTime(target.hour, target.minute);
+    result = await service.findTrucksByTime(target.hour, target.minute);
+    sourceLabel = '資料來源: 資料庫 (預測模式)';
+  } else {
+    result = realTimeTrucks;
+    bool isApiData = realTimeTrucks.isNotEmpty && realTimeTrucks.any((t) => t.carNumber != '已過站' && t.carNumber != '預定車');
+    sourceLabel = isApiData ? '資料來源: 雲端 API (即時)' : '資料來源: 資料庫 (API 攔截/沒車)';
   }
 
-  return realTimeTrucks;
+  // 修正：使用 Future.microtask 延遲更新另一個 Provider，避免初始化期間修改衝突
+  final finalLabel = '$sourceLabel | 顯示筆數: ${result.length}';
+  Future.microtask(() {
+    ref.read(sourceInfoProvider.notifier).setInfo(finalLabel);
+  });
+
+  return result;
 });
 
 class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {

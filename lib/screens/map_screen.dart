@@ -139,7 +139,8 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               const SizedBox(height: 30),
               Text(progressMsg, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
               const SizedBox(height: 15),
-              Text('正在載入 ${config.appTitle} 資料庫', style: const TextStyle(color: Colors.grey)),
+              const Text('請檢查日誌檔案以獲取詳細資訊：', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              const SelectionArea(child: Text('C:\\Users\\bapral\\AppData\\Local\\garbage_map_debug.log', style: TextStyle(color: Colors.blueGrey, fontSize: 10))),
             ],
           ),
         ),
@@ -180,9 +181,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
               Consumer(
                 builder: (context, ref, child) {
                   final count = ref.watch(routeDataCountProvider);
+                  final sourceInfo = ref.watch(sourceInfoProvider);
                   return SelectionArea(
-                    child: Text('快取: $count | 模式: ${isNow ? "即時" : "預定"} | 位置: ${locationMode == LocationMode.auto ? "自動" : "手動"}', 
-                      style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('快取: $count | 位置: ${locationMode == LocationMode.auto ? "自動" : "手動"}', 
+                          style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                        Text(sourceInfo, style: const TextStyle(fontSize: 10, color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -224,7 +232,32 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       ),
       body: trucksAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, stack) => Center(child: Text('載入失敗: $err')),
+        error: (err, stack) => Center(
+          child: SelectionArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  const Text('載入失敗', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  SelectableText(
+                    err.toString(),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.redAccent),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => ref.read(garbageTrucksProvider.notifier).refresh(),
+                    child: const Text('重試'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         data: (trucks) => Stack(
           children: [
             FlutterMap(

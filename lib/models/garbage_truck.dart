@@ -18,74 +18,56 @@ class GarbageTruck {
   });
 
   factory GarbageTruck.fromJson(Map<String, dynamic> json) {
+    // 自動尋找可能的車牌 Key
+    String car = (json['car'] ?? json['PlateNumb'] ?? json['car_number'] ?? json['PlateNumber'] ?? '未知').toString();
+    
+    // 自動尋找可能的路線 Key
+    String line = (json['lineid'] ?? json['RouteID'] ?? json['route_id'] ?? '無').toString();
+    
+    // 自動尋找可能的經緯度 Key
+    double lat = double.tryParse((json['latitude'] ?? json['Latitude'] ?? json['lat'] ?? '0').toString()) ?? 0;
+    double lng = double.tryParse((json['longitude'] ?? json['Longitude'] ?? json['lng'] ?? '0').toString()) ?? 0;
+    
+    // 位置描述
+    String loc = (json['location'] ?? json['address'] ?? json['Address'] ?? '').toString();
+    
+    // 更新時間
+    DateTime time = DateTime.tryParse((json['time'] ?? json['GPSTime'] ?? json['update_time'] ?? '').toString()) ?? DateTime.now();
+
     return GarbageTruck(
-      carNumber: json['car'] ?? '未知',
-      lineId: json['lineid'] ?? '無',
-      location: json['location'] ?? '',
-      position: LatLng(
-        double.tryParse(json['latitude']?.toString() ?? '0') ?? 0,
-        double.tryParse(json['longitude']?.toString() ?? '0') ?? 0,
-      ),
-      updateTime: DateTime.tryParse(json['time']?.toString() ?? '') ?? DateTime.now(),
+      carNumber: car,
+      lineId: line,
+      location: loc,
+      position: LatLng(lat, lng),
+      updateTime: time,
     );
   }
 
-  // 基於路線資料的精確預測
-  LatLng predictOnRoute(Duration duration, List<GarbageRoutePoint> allRoutePoints) {
-    if (duration == Duration.zero) return position;
-
-    // 1. 篩選出屬於此路線的所有清運點，並依 rank 排序
-    final routePoints = allRoutePoints.where((p) => p.lineId == lineId).toList()
-      ..sort((a, b) => a.rank.compareTo(b.rank));
-
-    if (routePoints.isEmpty) return predictPosition(duration); // 找不到路線則退回線性模擬
-
-    // 2. 找到離目前車子最近的清運點索引 (假設目前車子就在這點附近)
-    final distanceCalc = const Distance();
-    int currentPointIndex = 0;
-    double minDistance = double.infinity;
-
-    for (int i = 0; i < routePoints.length; i++) {
-      final d = distanceCalc.as(LengthUnit.Meter, position, routePoints[i].position);
-      if (d < minDistance) {
-        minDistance = d;
-        currentPointIndex = i;
-      }
-    }
-
-    // 3. 根據時間推算前進的點數 (假設平均 3 分鐘移動一個點)
-    final int pointsToMove = (duration.inMinutes / 3).floor();
-    int predictedIndex = currentPointIndex + pointsToMove;
-
-    // 4. 防止超出索引範圍 (如果是環狀路線可使用 %，此處先以最大值限制)
-    if (predictedIndex >= routePoints.length) {
-      predictedIndex = routePoints.length - 1;
-    }
-
-    return routePoints[predictedIndex].position;
-  }
-
-  // 預測位置：根據經過的時間 (X 小時 Y 分鐘) 模擬預測位置 (線性模擬備案)
-  // 這裡使用車牌號碼作為隨機種子，讓同一台車的預測路徑一致
+  // 預測位置邏輯 (相對時間)
   LatLng predictPosition(Duration duration) {
     if (duration == Duration.zero) return position;
-
     final double minutes = duration.inMinutes.toDouble();
-    final int seed = carNumber.hashCode;
-    final Random random = Random(seed);
-
-    // 模擬垃圾車平均移動速度 (每分鐘移動約 0.0002 ~ 0.0005 經緯度單位，約 20-50公尺)
-    // 給予一個基於 seed 的隨機方向
+    final Random random = Random(carNumber.hashCode);
     final double angle = random.nextDouble() * 2 * pi;
     final double speed = (0.0002 + random.nextDouble() * 0.0003);
+    return LatLng(position.latitude + sin(angle) * speed * minutes, position.longitude + cos(angle) * speed * minutes);
+  }
 
-    // 簡單的線性預測 (實務上應搭配路線資料，此處為展示預測功能)
-    final double latOffset = sin(angle) * speed * minutes;
-    final double lngOffset = cos(angle) * speed * minutes;
-
-    return LatLng(
-      position.latitude + latOffset,
-      position.longitude + lngOffset,
-    );
+  // 循跡預測邏輯 (班表時間)
+  LatLng predictOnRoute(Duration duration, List<GarbageRoutePoint> allRoutePoints) {
+    if (duration == Duration.zero) return position;
+    final routePoints = allRoutePoints.where((p) => p.lineId == lineId).toList()..sort((a, b) => a.rank.compareTo(b.rank));
+    if (routePoints.isEmpty) return predictPosition(duration);
+    final distanceCalc = const Distance();
+    int currentIdx = 0;
+    double minD = double.infinity;
+    for (int i = 0; i < routePoints.length; i++) {
+      final d = distanceCalc.as(LengthUnit.Meter, position, routePoints[i].position);
+      if (d < minD) { minD = d; currentIdx = i; }
+    }
+    final int move = (duration.inMinutes / 3).floor();
+    int targetIdx = currentIdx + move;
+    if (targetIdx >= routePoints.length) targetIdx = routePoints.length - 1;
+    return routePoints[targetIdx].position;
   }
 }
