@@ -6,11 +6,24 @@ import '../models/garbage_truck.dart';
 import '../models/garbage_route_point.dart';
 import '../models/city_config.dart';
 import '../services/ntpc_garbage_service.dart';
+import '../services/taipei_garbage_service.dart';
 import '../services/database_service.dart';
+
+// 目前城市選擇
+final citySelectionProvider = NotifierProvider<CitySelectionNotifier, String>(CitySelectionNotifier.new);
+
+class CitySelectionNotifier extends Notifier<String> {
+  @override
+  String build() => 'ntpc';
+  void setCity(String city) => state = city;
+}
 
 // 全域服務 Provider
 final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
   final config = ref.watch(currentCityConfigProvider);
+  if (config.cityName == 'taipei') {
+    return TaipeiGarbageService(localSourceDir: config.localSourceDir);
+  }
   return NtpcGarbageService(localSourceDir: config.localSourceDir);
 });
 
@@ -24,13 +37,25 @@ class SourceInfoNotifier extends Notifier<String> {
 }
 
 // 目前城市配置
-final currentCityConfigProvider = Provider<CityConfig>((ref) => CityConfig(
-  cityName: 'ntpc',
-  appTitle: '新北市垃圾車即時地圖',
-  initialCenter: const LatLng(25.0125, 121.4650),
-  themeColor: Colors.yellow,
-  localSourceDir: r'D:\CLI\garbage\新北市垃圾車路線',
-));
+final currentCityConfigProvider = Provider<CityConfig>((ref) {
+  final city = ref.watch(citySelectionProvider);
+  if (city == 'taipei') {
+    return CityConfig(
+      cityName: 'taipei',
+      appTitle: '台北市垃圾車即時地圖',
+      initialCenter: const LatLng(25.0330, 121.5654),
+      themeColor: Colors.blue,
+      localSourceDir: r'D:\CLI\garbage\台北市垃圾車路線',
+    );
+  }
+  return CityConfig(
+    cityName: 'ntpc',
+    appTitle: '新北市垃圾車即時地圖',
+    initialCenter: const LatLng(25.0125, 121.4650),
+    themeColor: Colors.yellow,
+    localSourceDir: r'D:\CLI\garbage\新北市垃圾車路線',
+  );
+});
 
 // 位置模式 (自動/手動)
 enum LocationMode { auto, manual }
@@ -138,6 +163,12 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
 
   @override
   List<GarbageTruck> build() {
+    // 偵聽城市選擇，當切換城市時重新觸發 build
+    final city = ref.watch(citySelectionProvider);
+    
+    // 重設狀態，確保舊城市的資料不會留在畫面上
+    state = [];
+    
     Future.microtask(() async {
       final service = ref.read(garbageServiceProvider);
       ref.read(isSyncingProvider.notifier).setSyncing(true);
@@ -145,10 +176,10 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
         await service.syncDataIfNeeded(onProgress: (msg) {
           ref.read(syncProgressProvider.notifier).setProgress(msg);
         });
-        await _updateCount();
+        await _updateCount(city);
         await refresh();
       } catch (e) {
-        print('同步失敗: $e');
+        DatabaseService.log('同步失敗', error: e);
       } finally {
         ref.read(isSyncingProvider.notifier).setSyncing(false);
       }
@@ -159,31 +190,33 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
     return [];
   }
 
-  Future<void> _updateCount() async {
-    final count = await DatabaseService().getTotalCount();
+  Future<void> _updateCount(String city) async {
+    final count = await DatabaseService().getTotalCount(city);
     ref.read(routeDataCountProvider.notifier).setCount(count);
   }
 
   Future<void> refresh() async {
+    final city = ref.read(citySelectionProvider);
     final service = ref.read(garbageServiceProvider);
     try {
       final trucks = await service.fetchTrucks();
       state = trucks;
-      await _updateCount();
+      await _updateCount(city);
     } catch (e) {
-      print('重新整理失敗: $e');
+      DatabaseService.log('重新整理失敗', error: e);
     }
   }
 
   Future<void> forceUpdateRouteData() async {
+    final city = ref.read(citySelectionProvider);
     final service = ref.read(garbageServiceProvider);
     ref.read(isSyncingProvider.notifier).setSyncing(true);
     try {
-      await DatabaseService().updateVersion('force_refresh');
+      await DatabaseService().updateVersion('force_refresh_$city');
       await service.syncDataIfNeeded(onProgress: (msg) {
         ref.read(syncProgressProvider.notifier).setProgress(msg);
       });
-      await _updateCount();
+      await _updateCount(city);
       await refresh();
     } finally {
       ref.read(isSyncingProvider.notifier).setSyncing(false);

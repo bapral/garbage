@@ -200,6 +200,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         backgroundColor: config.themeColor[700],
         actions: [
           IconButton(
+            icon: const Icon(Icons.location_city),
+            onPressed: () => _showCitySelectionDialog(),
+            tooltip: '切換城市',
+          ),
+          IconButton(
             icon: Icon(isNow ? Icons.refresh : Icons.auto_graph),
             onPressed: isNow 
               ? () {
@@ -287,17 +292,73 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
                 MarkerLayer(
                   markers: trucks.map((truck) {
+                    // 更準確的城市判斷：檢查 lineId 是否包含台北，或者目前的城市配置是否為台北且該車輛不是來自新北
+                    final bool isTaipei = truck.lineId.contains('台北') || (config.cityName == 'taipei' && !truck.lineId.contains('新北'));
+                    final Color cityColor = isTaipei ? Colors.blue[700]! : Colors.orange[800]!;
+                    final String cityShort = isTaipei ? '北' : '新';
+                    
                     return Marker(
                       point: truck.position,
-                      width: 50,
-                      height: 50,
+                      width: 65,
+                      height: 65,
                       child: GestureDetector(
                         onTap: () => _showTruckInfo(truck),
-                        child: Icon(
-                          Icons.local_shipping,
-                          color: isNow ? Colors.orange : Colors.blue,
-                          size: 35,
-                          shadows: [Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4, offset: const Offset(2, 2))],
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            // 底部發光背景
+                            Container(
+                              width: 45,
+                              height: 45,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: cityColor, width: 2),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: cityColor.withValues(alpha: 0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                                  const BoxShadow(
+                                    color: Colors.black26,
+                                    blurRadius: 4,
+                                    offset: Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // 車輛圖標
+                            Opacity(
+                              opacity: isNow ? 1.0 : 0.7,
+                              child: Icon(
+                                Icons.local_shipping_rounded,
+                                color: cityColor,
+                                size: 28,
+                              ),
+                            ),
+                            // 城市標籤
+                            Positioned(
+                              top: 5,
+                              right: 5,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: cityColor,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 1.5),
+                                ),
+                                child: Text(
+                                  cityShort,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -419,6 +480,47 @@ class _MapScreenState extends ConsumerState<MapScreen> {
         ],
       ),
     );
+  }
+
+  void _showCitySelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('選擇城市'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.map, color: Colors.blue),
+                title: const Text('台北市'),
+                onTap: () {
+                  ref.read(citySelectionProvider.notifier).setCity('taipei');
+                  Navigator.pop(context);
+                  _onCityChanged();
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.map, color: Colors.yellow),
+                title: const Text('新北市'),
+                onTap: () {
+                  ref.read(citySelectionProvider.notifier).setCity('ntpc');
+                  Navigator.pop(context);
+                  _onCityChanged();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _onCityChanged() {
+    _clearAllPolylines();
+    final config = ref.read(currentCityConfigProvider);
+    _mapController.move(config.initialCenter, 14.0);
   }
 
   void _showPredictionDialog() {

@@ -1,13 +1,34 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'screens/map_screen.dart';
+import 'services/database_service.dart';
 
 void main() {
-  runApp(
-    const ProviderScope(
-      child: GarbageMapApp(),
-    ),
-  );
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    DatabaseService.log('Application starting...');
+    
+    FlutterError.onError = (FlutterErrorDetails details) {
+      DatabaseService.log('Flutter Error', error: details.exception, stackTrace: details.stack);
+      FlutterError.presentError(details);
+    };
+
+    PlatformDispatcher.instance.onError = (error, stack) {
+      DatabaseService.log('Platform Dispatcher Error', error: error, stackTrace: stack);
+      return true;
+    };
+
+    runApp(
+      const ProviderScope(
+        child: GarbageMapApp(),
+      ),
+    );
+  }, (error, stack) {
+    DatabaseService.log('Uncaught Global Error', error: error, stackTrace: stack);
+  });
 }
 
 class GarbageMapApp extends StatelessWidget {

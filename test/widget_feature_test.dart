@@ -24,7 +24,6 @@ class MockGarbageTrucksNotifier extends GarbageTrucksNotifier {
 
 void main() {
   testWidgets('Feature UI Elements Test', (WidgetTester tester) async {
-    // 建立一個包含 Mock Provider 的環境
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -34,15 +33,22 @@ void main() {
       ),
     );
 
+    // 等待初始化結束
+    await tester.pump();
+
     // 1. 檢查是否有「預測按鈕」(時鐘圖示)
     expect(find.byIcon(Icons.timer), findsOneWidget);
 
     // 2. 檢查是否有「尋找最近按鈕」(near_me 圖示)
     expect(find.byIcon(Icons.near_me), findsOneWidget);
 
-    // 3. 測試點擊預測按鈕是否會彈出對話框
+    // 3. 測試點擊預測按鈕彈出選單，再點擊第一個 ListTile
     await tester.tap(find.byIcon(Icons.timer));
-    await tester.pumpAndSettle(); // 等待對話框彈出動畫
+    await tester.pumpAndSettle();
+    expect(find.text('預測功能選擇'), findsOneWidget);
+    
+    await tester.tap(find.text('預測 X 小時 Y 分後'));
+    await tester.pumpAndSettle();
     expect(find.text('預測幾小時幾分鐘後？'), findsOneWidget);
     
     // 4. 點擊「取消」關閉對話框

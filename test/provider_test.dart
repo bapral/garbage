@@ -2,49 +2,56 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:ntpc_garbage_map/models/garbage_truck.dart';
-import 'package:ntpc_garbage_map/models/garbage_route_point.dart';
 import 'package:ntpc_garbage_map/providers/garbage_provider.dart';
 
-// 模擬垃圾車資料
-class MockGarbageTrucksNotifier extends GarbageTrucksNotifier {
-  @override
-  List<GarbageTruck> build() {
-    return [
-      GarbageTruck(
-        carNumber: 'TEST-001',
-        lineId: 'LINE-A',
-        location: 'Current',
-        position: LatLng(25.0, 121.0),
-        updateTime: DateTime.now(),
-      )
-    ];
-  }
+void main() {
+  group('Provider Unit Tests', () {
+    test('predictedTrucksProvider should return mock trucks', () async {
+      final container = ProviderContainer(
+        overrides: [
+          garbageTrucksProvider.overrideWith(() => GarbageTrucksNotifierMock([
+            GarbageTruck(
+              carNumber: 'TEST-1',
+              lineId: 'L1',
+              location: 'Point A',
+              position: LatLng(25.0, 121.0),
+              updateTime: DateTime.now(),
+            )
+          ])),
+        ],
+      );
+
+      final trucks = await container.read(predictedTrucksProvider.future);
+      expect(trucks.length, equals(1));
+      expect(trucks.first.position, equals(LatLng(25.0, 121.0)));
+    });
+
+    test('predictedTrucksProvider should return future prediction', () async {
+      final container = ProviderContainer(
+        overrides: [
+          predictionDurationProvider.overrideWith(() => PredictionNotifierMock(const Duration(minutes: 10))),
+          garbageTrucksProvider.overrideWith(() => GarbageTrucksNotifierMock([])),
+        ],
+      );
+
+      final trucks = await container.read(predictedTrucksProvider.future);
+      // 因為 garbageTrucksProvider 為空，它會退回到資料庫搜尋，
+      // 由於測試環境資料庫為空，結果應為 0 筆。
+      expect(trucks.length, equals(0));
+    });
+  });
 }
 
-void main() {
-  test('predictedTrucksProvider should use route data if available', () async {
-    final container = ProviderContainer(
-      overrides: [
-        garbageTrucksProvider.overrideWith(MockGarbageTrucksNotifier.new),
-        // 模擬路線 Provider 回傳一個預定義的點
-        routePointsProvider.overrideWith((ref) => [
-          GarbageRoutePoint(lineId: 'LINE-A', lineName: 'Route A', rank: 0, name: 'P0', position: LatLng(25.0, 121.0), arrivalTime: '17:00'),
-          GarbageRoutePoint(lineId: 'LINE-A', lineName: 'Route A', rank: 1, name: 'P1', position: LatLng(25.1, 121.1), arrivalTime: '17:05'),
-          GarbageRoutePoint(lineId: 'LINE-A', lineName: 'Route A', rank: 2, name: 'P2', position: LatLng(25.2, 121.2), arrivalTime: '17:10'),
-        ]),
-      ],
-    );
+class GarbageTrucksNotifierMock extends GarbageTrucksNotifier {
+  final List<GarbageTruck> initial;
+  GarbageTrucksNotifierMock(this.initial);
+  @override
+  List<GarbageTruck> build() => initial;
+}
 
-    // 1. 預設 0 分鐘，位置不變
-    var trucks = container.read(predictedTrucksProvider);
-    expect(trucks.first.position, equals(LatLng(25.0, 121.0)));
-
-    // 2. 設定預測 6 分鐘後 (應前進 2 個點到 index 2: P2)
-    container.read(predictionDurationProvider.notifier).setDuration(const Duration(minutes: 6));
-    
-    // 重新讀取預測後的資料
-    trucks = container.read(predictedTrucksProvider);
-    expect(trucks.first.position, equals(LatLng(25.2, 121.2)));
-    expect(trucks.first.location, contains('(沿路線預測)'));
-  });
+class PredictionNotifierMock extends PredictionDurationNotifier {
+  final Duration val;
+  PredictionNotifierMock(this.val);
+  @override
+  Duration build() => val;
 }

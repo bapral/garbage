@@ -13,10 +13,9 @@ void main() {
     late DatabaseService dbService;
 
     setUp(() async {
+      DatabaseService.customPath = inMemoryDatabasePath;
+      DatabaseService.resetInstance();
       dbService = DatabaseService();
-      final db = await dbService.db;
-      await db.delete(DatabaseService.tableName);
-      await db.delete(DatabaseService.metaTable);
     });
 
     test('GarbageTruck.predictOnRoute calculates correct future position', () {

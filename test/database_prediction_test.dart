@@ -13,11 +13,12 @@ void main() {
     late DatabaseService dbService;
 
     setUp(() async {
+      // 設定使用記憶體資料庫
+      DatabaseService.customPath = inMemoryDatabasePath;
+      DatabaseService.resetInstance();
+      
       dbService = DatabaseService();
-      // 使用記憶體資料庫進行測試 (sqflite_ffi 支援)
-      // 但因為 DatabaseService 內部寫死了路徑，我們這裡直接使用它，並確保先清空
-      final db = await dbService.db;
-      await db.delete(DatabaseService.tableName);
+      // 在記憶體中，onCreate 會自動執行，所以不需要手動 delete
     });
 
     test('findPointsByTime should return correct points for a specific hour/minute', () async {
@@ -29,12 +30,12 @@ void main() {
 
       await dbService.saveRoutePoints(mockPoints);
 
-      // 搜尋 20:30 左右的點
+      // 搜尋 20:30 左右的點 (區間為 20:15 - 20:45)
       final results = await dbService.findPointsByTime(20, 30);
       
-      expect(results.length, equals(1));
-      expect(results.first.name, equals('Central 8th St'));
-      expect(results.first.arrivalTime, equals('20:30'));
+      expect(results.length, equals(2));
+      expect(results.any((p) => p.name == 'Central 8th St'), isTrue);
+      expect(results.any((p) => p.name == 'Other St'), isTrue);
     });
 
     test('findPointsByTime should return points within the same 10-minute block', () async {

@@ -21,7 +21,7 @@ abstract class BaseGarbageService {
 class NtpcGarbageService extends BaseGarbageService {
   // 依照使用者提供的正確即時位置 CSV 端點
   static const String apiUrl = 'https://data.ntpc.gov.tw/api/datasets/28ab4122-60e1-4065-98e5-abccb69aaca6/csv';
-  static const String routeUrl = 'https://data.ntpc.gov.tw/api/datasets/edc3ad26-8ae7-4916-a00b-bc6048d19bf8/json';
+  static const String routeUrl = 'https://data.ntpc.gov.tw/api/datasets/edc3ad26-8ae7-4916-a00b-bc6048d19bf8/csv';
 
   static const Map<String, String> _headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -30,7 +30,10 @@ class NtpcGarbageService extends BaseGarbageService {
   };
 
   final DatabaseService _dbService = DatabaseService();
-  NtpcGarbageService({required super.localSourceDir});
+  final http.Client _client;
+
+  NtpcGarbageService({required super.localSourceDir, http.Client? client}) 
+      : _client = client ?? http.Client();
 
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
@@ -38,18 +41,86 @@ class NtpcGarbageService extends BaseGarbageService {
     final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
     final String? storedVersion = await _dbService.getStoredVersion();
 
-    if (storedVersion == currentAppVersion && await _dbService.hasData()) {
-      onProgress?.call('資料版本一致，準備就緒...');
+    bool needsUpdate = storedVersion != currentAppVersion || !(await _dbService.hasData('ntpc'));
+
+    if (!needsUpdate) {
+      onProgress?.call('新北市資料已就緒...');
       return;
     }
 
-    onProgress?.call('正在更新新北市路線資料庫...');
-    await _dbService.clearAllRoutePoints();
-    if (await _importFromLocalCSV(onProgress)) {
+    onProgress?.call('正在嘗試從雲端更新新北市路線...');
+    bool apiSuccess = await _syncFromApi(onProgress);
+
+    if (apiSuccess) {
       await _dbService.updateVersion(currentAppVersion);
+      onProgress?.call('新北市路線已透過 API 更新完成！');
     } else {
-      await _insertMockRouteData();
+      onProgress?.call('API 更新失敗或筆數不足，嘗試從本地 CSV 恢復...');
+      if (await _importFromLocalCSV(onProgress)) {
+        await _dbService.updateVersion(currentAppVersion);
+        onProgress?.call('新北市路線已從本地 CSV 更新完成。');
+      } else {
+        onProgress?.call('新北市本地 CSV 也無法讀取，嘗試使用模擬資料。');
+        await _insertMockRouteData();
+      }
     }
+  }
+
+  Future<bool> _syncFromApi(void Function(String)? onProgress) async {
+    try {
+      // 請求較大筆數 (size=100000) 以獲取完整路線
+      final response = await _client.get(Uri.parse('$routeUrl?size=100000'), headers: _headers);
+      
+      if (response.statusCode == 200) {
+        final String body = response.body.trim();
+        final List<List<dynamic>> fields = const CsvToListConverter(
+          shouldParseNumbers: false, 
+          eol: '\n'
+        ).convert(body);
+
+        if (fields.length > 5000) {
+          onProgress?.call('從新北市路線 API 獲取 ${fields.length - 1} 筆點位，準備更新...');
+          await _dbService.clearAllRoutePoints('ntpc');
+          
+          final header = fields[0].map((e) => e.toString().toLowerCase().trim()).toList();
+          int idxLineId = header.indexOf('lineid');
+          int idxLat = header.indexOf('latitude');
+          int idxLng = header.indexOf('longitude');
+          int idxTime = header.indexOf('time');
+          int idxLineName = header.indexOf('linename');
+          int idxName = header.indexOf('name');
+          int idxRank = header.indexOf('rank');
+
+          List<GarbageRoutePoint> batch = [];
+          for (int i = 1; i < fields.length; i++) {
+            final row = fields[i];
+            if (row.length < 4) continue;
+
+            batch.add(GarbageRoutePoint(
+              lineId: row[idxLineId].toString(),
+              lineName: idxLineName != -1 ? row[idxLineName].toString() : '',
+              rank: idxRank != -1 ? (int.tryParse(row[idxRank].toString()) ?? 0) : i,
+              name: idxName != -1 ? row[idxName].toString() : '',
+              position: LatLng(
+                double.tryParse(row[idxLat].toString()) ?? 0, 
+                double.tryParse(row[idxLng].toString()) ?? 0
+              ),
+              arrivalTime: row[idxTime].toString(),
+            ));
+
+            if (batch.length >= 1000) {
+              await _dbService.saveRoutePoints(batch, 'ntpc');
+              batch.clear();
+            }
+          }
+          if (batch.isNotEmpty) await _dbService.saveRoutePoints(batch, 'ntpc');
+          return true;
+        }
+      }
+    } catch (e) {
+      print('新北市 API 同步發生異常: $e');
+    }
+    return false;
   }
 
   Future<bool> _importFromLocalCSV(void Function(String)? onProgress) async {
@@ -93,12 +164,12 @@ class NtpcGarbageService extends BaseGarbageService {
           arrivalTime: row[idxTime].toString(),
         ));
         if (batch.length >= 1000) { 
-          await _dbService.saveRoutePoints(batch); 
+          await _dbService.saveRoutePoints(batch, 'ntpc'); 
           batch.clear(); 
           onProgress?.call('已匯入 $i / $totalRows 筆...');
         }
       }
-      if (batch.isNotEmpty) await _dbService.saveRoutePoints(batch);
+      if (batch.isNotEmpty) await _dbService.saveRoutePoints(batch, 'ntpc');
       return true;
     } catch (e) {
       return false;
@@ -108,8 +179,11 @@ class NtpcGarbageService extends BaseGarbageService {
   @override
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
-      // 請求即時 CSV 資料
-      final response = await http.get(Uri.parse('$apiUrl?size=500'), headers: _headers);
+      // 增加 size 並加入時間戳記以避開快取
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String requestUrl = '$apiUrl?size=20000&_t=$timestamp';
+      
+      final response = await _client.get(Uri.parse(requestUrl), headers: _headers);
       if (response.statusCode == 200) {
         final String body = response.body.trim();
         // 解析 CSV
@@ -155,7 +229,7 @@ class NtpcGarbageService extends BaseGarbageService {
 
   @override
   Future<List<GarbageTruck>> findTrucksByTime(int hour, int minute) async {
-    final points = await _dbService.findPointsByTime(hour, minute);
+    final points = await _dbService.findPointsByTime(hour, minute, 'ntpc');
     final now = DateTime.now();
     return points.map((p) {
       DateTime scheduledTime = now;
@@ -175,12 +249,12 @@ class NtpcGarbageService extends BaseGarbageService {
 
   @override
   Future<List<GarbageRoutePoint>> getRouteForLine(String lineId) async {
-    return await _dbService.getRoutePoints(lineId);
+    return await _dbService.getRoutePoints(lineId, 'ntpc');
   }
 
   Future<void> _insertMockRouteData() async {
     await _dbService.saveRoutePoints([
       GarbageRoutePoint(lineId: '新店-01', lineName: '新店線', rank: 1, name: '中央八街口', position: LatLng(24.9742, 121.5284), arrivalTime: '20:30'),
-    ]);
+    ], 'ntpc');
   }
 }

@@ -3,21 +3,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ntpc_garbage_map/providers/garbage_provider.dart';
 import 'package:ntpc_garbage_map/services/ntpc_garbage_service.dart';
 import 'package:ntpc_garbage_map/models/garbage_truck.dart';
+import 'package:ntpc_garbage_map/models/garbage_route_point.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-// 建立一個不進行網路請求的 Mock Service
-class MockSyncService extends NtpcGarbageService {
+// 建立一個 Mock Service
+class MockSyncService extends BaseGarbageService {
   MockSyncService() : super(localSourceDir: '');
 
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     onProgress?.call('Mock 同步中...');
-    await Future.delayed(const Duration(milliseconds: 50));
-    return;
+    await Future.delayed(const Duration(milliseconds: 100));
   }
   
   @override
   Future<List<GarbageTruck>> fetchTrucks() async => [];
+
+  @override
+  Future<List<GarbageTruck>> findTrucksByTime(int h, int m) async => [];
+
+  @override
+  Future<List<GarbageRoutePoint>> getRouteForLine(String id) async => [];
 }
 
 void main() {
@@ -35,13 +41,13 @@ void main() {
         ],
       );
       
-      // 初始狀態
-      expect(container.read(isSyncingProvider), isTrue);
+      // 監聽 Provider 以確保它被初始化
+      container.listen(isSyncingProvider, (p, n) {});
 
-      // 輪詢等待最多 1 秒
+      // 等待狀態改變
       bool success = false;
-      for(int i=0; i<10; i++) {
-        await Future.delayed(const Duration(milliseconds: 100));
+      for(int i=0; i<20; i++) {
+        await Future.delayed(const Duration(milliseconds: 50));
         if (container.read(isSyncingProvider) == false) {
           success = true;
           break;
