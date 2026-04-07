@@ -32,8 +32,8 @@ void main() {
     });
 
     test('DatabaseService versioning logic works', () async {
-      await dbService.updateVersion('2.0.0');
-      final version = await dbService.getStoredVersion();
+      await dbService.updateVersion('2.0.0', 'ntpc');
+      final version = await dbService.getStoredVersion('ntpc');
       expect(version, equals('2.0.0'));
     });
 

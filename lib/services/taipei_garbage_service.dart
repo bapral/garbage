@@ -22,8 +22,8 @@ class TaipeiGarbageService extends BaseGarbageService {
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}_taipei';
-    final String? storedVersion = await _dbService.getStoredVersion();
+    final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    final String? storedVersion = await _dbService.getStoredVersion('taipei');
 
     bool needsUpdate = storedVersion != currentAppVersion || !(await _dbService.hasData('taipei'));
 
@@ -36,12 +36,12 @@ class TaipeiGarbageService extends BaseGarbageService {
     bool apiSuccess = await _syncFromApi(onProgress);
 
     if (apiSuccess) {
-      await _dbService.updateVersion(currentAppVersion);
+      await _dbService.updateVersion(currentAppVersion, 'taipei');
       onProgress?.call('台北市路線已透過 API 更新完成！');
     } else {
       onProgress?.call('API 更新失敗或筆數不足，嘗試從本地 CSV 恢復...');
       if (await _importFromLocalCSV(onProgress)) {
-        await _dbService.updateVersion(currentAppVersion);
+        await _dbService.updateVersion(currentAppVersion, 'taipei');
         onProgress?.call('台北市路線已從本地 CSV 更新完成。');
       } else {
         onProgress?.call('台北市本地 CSV 也無法讀取，維持現狀。');

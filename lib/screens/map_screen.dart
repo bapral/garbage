@@ -302,9 +302,15 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     } else if (truck.lineId.contains('台中') || (config.cityName == 'taichung' && !truck.lineId.contains('新北') && !truck.lineId.contains('台北'))) {
                       cityColor = Colors.green[700]!;
                       cityShort = '中';
-                    } else {
+                    } else if (truck.lineId.contains('新北') || config.cityName == 'ntpc') {
                       cityColor = Colors.orange[800]!;
                       cityShort = '新';
+                    } else if (config.cityName == 'tainan' || truck.lineId.contains('台南')) {
+                      cityColor = Colors.deepOrange[700]!;
+                      cityShort = '南';
+                    } else {
+                      cityColor = Colors.grey[700]!;
+                      cityShort = '?';
                     }
                     
                     return Marker(
@@ -526,6 +532,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 title: const Text('台中市'),
                 onTap: () {
                   ref.read(citySelectionProvider.notifier).setCity('taichung');
+                  Navigator.pop(context);
+                  _onCityChanged();
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.map, color: Colors.orange),
+                title: const Text('台南市'),
+                onTap: () {
+                  ref.read(citySelectionProvider.notifier).setCity('tainan');
                   Navigator.pop(context);
                   _onCityChanged();
                 },

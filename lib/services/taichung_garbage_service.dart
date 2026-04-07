@@ -24,8 +24,8 @@ class TaichungGarbageService extends BaseGarbageService {
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}_taichung';
-    final String? storedVersion = await _dbService.getStoredVersion();
+    final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    final String? storedVersion = await _dbService.getStoredVersion('taichung');
 
     bool needsUpdate = storedVersion != currentAppVersion || !(await _dbService.hasData('taichung'));
 
@@ -38,9 +38,8 @@ class TaichungGarbageService extends BaseGarbageService {
     
     try {
       // 1. 先抓取即時動態 API，建立「車牌 -> 最新位置」的對照表
-      // 因為台中市的定時定點 JSON 裡沒有經緯度，我們必須從動態資料中「借用」位置
       onProgress?.call('獲取台中市即時動態位置以比對站點...');
-      final dynamicResponse = await _client.get(Uri.parse('$dynamicApiUrl&limit=20000'));
+      final dynamicResponse = await _client.get(Uri.parse('$dynamicApiUrl&limit=20000')).timeout(const Duration(seconds: 15));
       Map<String, LatLng> carPositions = {};
       if (dynamicResponse.statusCode == 200) {
         final List<dynamic> dynamicData = json.decode(dynamicResponse.body);
@@ -59,17 +58,15 @@ class TaichungGarbageService extends BaseGarbageService {
       final String jsonPath = join(localSourceDir, '0_臺中市定時定點垃圾收運地點.JSON');
       final File jsonFile = File(jsonPath);
       if (!await jsonFile.exists()) {
-        onProgress?.call('找不到本地 JSON，嘗試從雲端抓取班表...');
-        // 如果本地沒有，可以考慮從雲端抓取 (選用)
+        throw Exception('找不到本地 JSON 班表檔案: $jsonPath');
       }
 
       final String content = await jsonFile.readAsString();
       final List<dynamic> scheduleData = json.decode(content);
       
-      onProgress?.call('正在寫入資料庫: ${scheduleData.length} 筆...');
-      await _dbService.clearAllRoutePoints('taichung');
+      onProgress?.call('正在解析台中市路線: ${scheduleData.length} 筆...');
       
-      List<GarbageRoutePoint> batch = [];
+      List<GarbageRoutePoint> allPoints = [];
       int dayOfWeek = DateTime.now().weekday; // 1-7 (Mon-Sun)
       
       for (int i = 0; i < scheduleData.length; i++) {
@@ -90,10 +87,9 @@ class TaichungGarbageService extends BaseGarbageService {
         if (arrivalTime.isEmpty) continue;
 
         // 嘗試從剛才建立的對照表中找出這台車的「可能位置」
-        // 注意：這是一個妥協方案，因為原始資料中沒有站點經緯度
         LatLng pos = carPositions[carNo] ?? const LatLng(24.147, 120.673);
 
-        batch.add(GarbageRoutePoint(
+        allPoints.add(GarbageRoutePoint(
           lineId: carNo,
           lineName: '${item['area'] ?? ''}${item['village'] ?? ''} ($carNo)',
           rank: i,
@@ -101,16 +97,12 @@ class TaichungGarbageService extends BaseGarbageService {
           position: pos,
           arrivalTime: arrivalTime,
         ));
-
-        if (batch.length >= 1000) {
-          await _dbService.saveRoutePoints(batch, 'taichung');
-          batch.clear();
-          onProgress?.call('寫入進度: $i / ${scheduleData.length}...');
-        }
       }
       
-      if (batch.isNotEmpty) await _dbService.saveRoutePoints(batch, 'taichung');
-      await _dbService.updateVersion(currentAppVersion);
+      onProgress?.call('正在原子寫入資料庫 ${allPoints.length} 筆...');
+      await _dbService.clearAndSaveRoutePoints(allPoints, 'taichung');
+      
+      await _dbService.updateVersion(currentAppVersion, 'taichung');
       onProgress?.call('台中市資料同步完成！');
       
     } catch (e, stack) {
@@ -168,6 +160,8 @@ class TaichungGarbageService extends BaseGarbageService {
   @override
   Future<List<GarbageTruck>> findTrucksByTime(int hour, int minute) async {
     final points = await _dbService.findPointsByTime(hour, minute, 'taichung');
+    DatabaseService.log('台中市預測查詢: $hour:$minute, 找到 ${points.length} 筆點位');
+    
     final now = DateTime.now();
     return points.map((p) {
       DateTime scheduledTime = now;

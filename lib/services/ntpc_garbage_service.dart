@@ -39,7 +39,7 @@ class NtpcGarbageService extends BaseGarbageService {
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
     final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
-    final String? storedVersion = await _dbService.getStoredVersion();
+    final String? storedVersion = await _dbService.getStoredVersion('ntpc');
 
     bool needsUpdate = storedVersion != currentAppVersion || !(await _dbService.hasData('ntpc'));
 
@@ -52,12 +52,12 @@ class NtpcGarbageService extends BaseGarbageService {
     bool apiSuccess = await _syncFromApi(onProgress);
 
     if (apiSuccess) {
-      await _dbService.updateVersion(currentAppVersion);
+      await _dbService.updateVersion(currentAppVersion, 'ntpc');
       onProgress?.call('新北市路線已透過 API 更新完成！');
     } else {
       onProgress?.call('API 更新失敗或筆數不足，嘗試從本地 CSV 恢復...');
       if (await _importFromLocalCSV(onProgress)) {
-        await _dbService.updateVersion(currentAppVersion);
+        await _dbService.updateVersion(currentAppVersion, 'ntpc');
         onProgress?.call('新北市路線已從本地 CSV 更新完成。');
       } else {
         onProgress?.call('新北市本地 CSV 也無法讀取，嘗試使用模擬資料。');

@@ -8,6 +8,7 @@ import '../models/city_config.dart';
 import '../services/ntpc_garbage_service.dart';
 import '../services/taipei_garbage_service.dart';
 import '../services/taichung_garbage_service.dart';
+import '../services/tainan_garbage_service.dart';
 import '../services/database_service.dart';
 
 // 目前城市選擇
@@ -26,6 +27,8 @@ final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
     return TaipeiGarbageService(localSourceDir: config.localSourceDir);
   } else if (config.cityName == 'taichung') {
     return TaichungGarbageService(localSourceDir: config.localSourceDir);
+  } else if (config.cityName == 'tainan') {
+    return TainanGarbageService(localSourceDir: config.localSourceDir);
   }
   return NtpcGarbageService(localSourceDir: config.localSourceDir);
 });
@@ -57,6 +60,14 @@ final currentCityConfigProvider = Provider<CityConfig>((ref) {
       initialCenter: const LatLng(24.1477, 120.6736),
       themeColor: Colors.green,
       localSourceDir: r'D:\CLI\garbage\臺中市定時定點垃圾收運地點',
+    );
+  } else if (city == 'tainan') {
+    return CityConfig(
+      cityName: 'tainan',
+      appTitle: '台南市垃圾車即時地圖',
+      initialCenter: const LatLng(22.9975, 120.2025),
+      themeColor: Colors.orange,
+      localSourceDir: r'D:\CLI\garbage\台南市垃圾車路線',
     );
   }
   return CityConfig(
@@ -221,16 +232,29 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
   Future<void> forceUpdateRouteData() async {
     final city = ref.read(citySelectionProvider);
     final service = ref.read(garbageServiceProvider);
-    ref.read(isSyncingProvider.notifier).setSyncing(true);
-    try {
-      await DatabaseService().updateVersion('force_refresh_$city');
-      await service.syncDataIfNeeded(onProgress: (msg) {
-        ref.read(syncProgressProvider.notifier).setProgress(msg);
-      });
-      await _updateCount(city);
+    
+    // 檢查目前是否處於「預測模式」
+    final targetTime = ref.read(targetTimeProvider);
+    final duration = ref.read(predictionDurationProvider);
+    final isPrediction = targetTime != null || duration != Duration.zero;
+
+    if (isPrediction) {
+      // 預測模式：重新從 JSON 同步資料庫 (針對台中市則是讀取 0_臺中市定時定點垃圾收運地點.JSON)
+      ref.read(isSyncingProvider.notifier).setSyncing(true);
+      try {
+        await DatabaseService().updateVersion('force_refresh_$city', city);
+        await service.syncDataIfNeeded(onProgress: (msg) {
+          ref.read(syncProgressProvider.notifier).setProgress(msg);
+        });
+        await _updateCount(city);
+        // 使 FutureProvider 重新計算以反映資料庫變更
+        ref.invalidate(predictedTrucksProvider);
+      } finally {
+        ref.read(isSyncingProvider.notifier).setSyncing(false);
+      }
+    } else {
+      // 即時模式：重新抓取線上車輛資料 (API)
       await refresh();
-    } finally {
-      ref.read(isSyncingProvider.notifier).setSyncing(false);
     }
   }
 

@@ -108,15 +108,15 @@ class DatabaseService {
     }
   }
 
-  Future<String?> getStoredVersion() async {
+  Future<String?> getStoredVersion(String city) async {
     final database = await db;
-    final List<Map<String, dynamic>> maps = await database.query(metaTable, where: 'key = ?', whereArgs: ['app_version']);
+    final List<Map<String, dynamic>> maps = await database.query(metaTable, where: 'key = ?', whereArgs: ['app_version_$city']);
     return maps.isNotEmpty ? maps.first['value'] : null;
   }
 
-  Future<void> updateVersion(String version) async {
+  Future<void> updateVersion(String version, String city) async {
     final database = await db;
-    await database.insert(metaTable, {'key': 'app_version', 'value': version}, conflictAlgorithm: ConflictAlgorithm.replace);
+    await database.insert(metaTable, {'key': 'app_version_$city', 'value': version}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   Future<void> clearAllRoutePoints(String city) async {
@@ -127,6 +127,23 @@ class DatabaseService {
   Future<void> saveRoutePoints(List<GarbageRoutePoint> points, String city) async {
     final database = await db;
     await database.transaction((txn) async {
+      final batch = txn.batch();
+      for (var p in points) {
+        batch.insert(tableName, {
+          'lineId': p.lineId, 'lineName': p.lineName, 'rank': p.rank, 'name': p.name,
+          'latitude': p.position.latitude, 'longitude': p.position.longitude, 'arrivalTime': p.arrivalTime,
+          'city': city,
+        });
+      }
+      await batch.commit(noResult: true);
+    });
+  }
+
+  /// 原子操作：清空該城市的舊點位並存入新點位，防止同步期間出現空資料
+  Future<void> clearAndSaveRoutePoints(List<GarbageRoutePoint> points, String city) async {
+    final database = await db;
+    await database.transaction((txn) async {
+      await txn.delete(tableName, where: 'city = ?', whereArgs: [city]);
       final batch = txn.batch();
       for (var p in points) {
         batch.insert(tableName, {
@@ -154,6 +171,9 @@ class DatabaseService {
     // 只抓取指定時間起 +20 分鐘內的資料
     final String start = _offsetTime(hour, minute, 0);
     final String end = _offsetTime(hour, minute, 20);
+    
+    await log('正在查詢點位: city=$city, range=$start~$end');
+    
     final List<Map<String, dynamic>> maps = await database.query(
       tableName, 
       where: "arrivalTime >= ? AND arrivalTime <= ? AND city = ?", 
