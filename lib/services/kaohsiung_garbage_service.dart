@@ -23,9 +23,16 @@ class KaohsiungGarbageService extends BaseGarbageService {
       : _client = client ?? http.Client();
 
   @override
-  Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
-    final PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+  Future<void> syncDataIfNeeded({void Function(String)? onProgress, String? debugVersion}) async {
+    String currentAppVersion;
+    try {
+      final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+    } catch (e) {
+      // 在測試環境中，如果無法獲取 PackageInfo，則使用傳入的 debugVersion 或預設值
+      currentAppVersion = debugVersion ?? 'test_version';
+    }
+    
     final String? storedVersion = await _dbService.getStoredVersion('kaohsiung');
 
     bool needsUpdate = storedVersion != currentAppVersion || !(await _dbService.hasData('kaohsiung'));
