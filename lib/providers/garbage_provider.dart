@@ -9,6 +9,7 @@ import '../services/ntpc_garbage_service.dart';
 import '../services/taipei_garbage_service.dart';
 import '../services/taichung_garbage_service.dart';
 import '../services/tainan_garbage_service.dart';
+import '../services/kaohsiung_garbage_service.dart';
 import '../services/database_service.dart';
 
 // 目前城市選擇
@@ -29,6 +30,8 @@ final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
     return TaichungGarbageService(localSourceDir: config.localSourceDir);
   } else if (config.cityName == 'tainan') {
     return TainanGarbageService(localSourceDir: config.localSourceDir);
+  } else if (config.cityName == 'kaohsiung') {
+    return KaohsiungGarbageService(localSourceDir: config.localSourceDir);
   }
   return NtpcGarbageService(localSourceDir: config.localSourceDir);
 });
@@ -68,6 +71,14 @@ final currentCityConfigProvider = Provider<CityConfig>((ref) {
       initialCenter: const LatLng(22.9975, 120.2025),
       themeColor: Colors.orange,
       localSourceDir: r'D:\CLI\garbage\台南市垃圾車路線',
+    );
+  } else if (city == 'kaohsiung') {
+    return CityConfig(
+      cityName: 'kaohsiung',
+      appTitle: '高雄市垃圾車即時地圖',
+      initialCenter: const LatLng(22.6273, 120.3014),
+      themeColor: Colors.purple,
+      localSourceDir: r'D:\CLI\garbage\高雄市垃圾車路線',
     );
   }
   return CityConfig(

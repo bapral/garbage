@@ -168,8 +168,8 @@ class DatabaseService {
 
   Future<List<GarbageRoutePoint>> findPointsByTime(int hour, int minute, String city) async {
     final database = await db;
-    // 只抓取指定時間起 +20 分鐘內的資料
-    final String start = _offsetTime(hour, minute, 0);
+    // 抓取指定時間前 10 分鐘到後 20 分鐘內的資料，增加容錯性
+    final String start = _offsetTime(hour, minute, -10);
     final String end = _offsetTime(hour, minute, 20);
     
     await log('正在查詢點位: city=$city, range=$start~$end');

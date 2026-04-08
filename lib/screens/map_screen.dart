@@ -546,6 +546,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   _onCityChanged();
                 },
               ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.map, color: Colors.purple),
+                title: const Text('高雄市'),
+                onTap: () {
+                  ref.read(citySelectionProvider.notifier).setCity('kaohsiung');
+                  Navigator.pop(context);
+                  _onCityChanged();
+                },
+              ),
             ],
           ),
         );
