@@ -12,7 +12,8 @@ import '../services/tainan_garbage_service.dart';
 import '../services/kaohsiung_garbage_service.dart';
 import '../services/database_service.dart';
 
-// 目前城市選擇
+/// 城市選擇狀態 Provider。
+/// 預設為 'ntpc' (新北市)。
 final citySelectionProvider = NotifierProvider<CitySelectionNotifier, String>(CitySelectionNotifier.new);
 
 class CitySelectionNotifier extends Notifier<String> {
@@ -21,7 +22,8 @@ class CitySelectionNotifier extends Notifier<String> {
   void setCity(String city) => state = city;
 }
 
-// 全域服務 Provider
+/// 垃圾清運服務實體 Provider。
+/// 根據 [currentCityConfigProvider] 的城市設定，回傳對應的服務類別實體。
 final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
   final config = ref.watch(currentCityConfigProvider);
   if (config.cityName == 'taipei') {
@@ -36,7 +38,7 @@ final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
   return NtpcGarbageService(localSourceDir: config.localSourceDir);
 });
 
-// 目前顯示來源與筆數 Provider
+/// 目前顯示來源與狀態文字 Provider，用於 UI 上顯示資料來源資訊。
 final sourceInfoProvider = NotifierProvider<SourceInfoNotifier, String>(SourceInfoNotifier.new);
 
 class SourceInfoNotifier extends Notifier<String> {
@@ -45,7 +47,8 @@ class SourceInfoNotifier extends Notifier<String> {
   void setInfo(String msg) => state = msg;
 }
 
-// 目前城市配置
+/// 目前城市配置 Provider。
+/// 定義各地圖初始中心點、主題顏色及本地資源路徑。
 final currentCityConfigProvider = Provider<CityConfig>((ref) {
   final city = ref.watch(citySelectionProvider);
   if (city == 'taipei') {
@@ -90,7 +93,7 @@ final currentCityConfigProvider = Provider<CityConfig>((ref) {
   );
 });
 
-// 位置模式 (自動/手動)
+/// 位置模式 Provider (自動 GPS 定位 或 手動地圖指定)。
 enum LocationMode { auto, manual }
 final locationModeProvider = NotifierProvider<LocationModeNotifier, LocationMode>(LocationModeNotifier.new);
 
@@ -100,7 +103,7 @@ class LocationModeNotifier extends Notifier<LocationMode> {
   void toggle() => state = (state == LocationMode.auto ? LocationMode.manual : LocationMode.auto);
 }
 
-// 手動指定的位置
+/// 手動指定位置 Provider。當模式為 manual 時，儲存使用者在地圖上點擊的座標。
 final manualPositionProvider = NotifierProvider<ManualPositionNotifier, LatLng?>(ManualPositionNotifier.new);
 
 class ManualPositionNotifier extends Notifier<LatLng?> {
@@ -109,7 +112,7 @@ class ManualPositionNotifier extends Notifier<LatLng?> {
   void setPosition(LatLng? pos) => state = pos;
 }
 
-// 資料庫快取總筆數
+/// 本地資料庫中當前城市的快取總筆數 Provider。
 final routeDataCountProvider = NotifierProvider<RouteDataCountNotifier, int>(RouteDataCountNotifier.new);
 
 class RouteDataCountNotifier extends Notifier<int> {
@@ -118,7 +121,7 @@ class RouteDataCountNotifier extends Notifier<int> {
   void setCount(int value) => state = value;
 }
 
-// 是否正在同步資料庫
+/// 資料同步狀態 Provider。
 final isSyncingProvider = NotifierProvider<SyncStatusNotifier, bool>(SyncStatusNotifier.new);
 
 class SyncStatusNotifier extends Notifier<bool> {
@@ -127,7 +130,7 @@ class SyncStatusNotifier extends Notifier<bool> {
   void setSyncing(bool value) => state = value;
 }
 
-// 同步進度文字
+/// 同步進度描述 Provider。
 final syncProgressProvider = NotifierProvider<SyncProgressNotifier, String>(SyncProgressNotifier.new);
 
 class SyncProgressNotifier extends Notifier<String> {
@@ -136,7 +139,7 @@ class SyncProgressNotifier extends Notifier<String> {
   void setProgress(String msg) => state = msg;
 }
 
-// 目標預測時間
+/// 指定目標時間 Provider (絕對時間預測模式)。
 final targetTimeProvider = NotifierProvider<TargetTimeNotifier, DateTime?>(TargetTimeNotifier.new);
 
 class TargetTimeNotifier extends Notifier<DateTime?> {
@@ -146,7 +149,7 @@ class TargetTimeNotifier extends Notifier<DateTime?> {
   void reset() => state = null;
 }
 
-// 預測時間偏移
+/// 預測時間偏移 Provider (相對時間預測模式，例如 30 分鐘後)。
 final predictionDurationProvider = NotifierProvider<PredictionDurationNotifier, Duration>(PredictionDurationNotifier.new);
 
 class PredictionDurationNotifier extends Notifier<Duration> {
@@ -156,10 +159,14 @@ class PredictionDurationNotifier extends Notifier<Duration> {
   void reset() => state = Duration.zero;
 }
 
-// 垃圾車清單狀態 Provider
+/// 垃圾車原始資料狀態 Provider，負責定期從服務端抓取最新車輛資訊。
 final garbageTrucksProvider = NotifierProvider<GarbageTrucksNotifier, List<GarbageTruck>>(GarbageTrucksNotifier.new);
 
-// 最終顯示清單 Provider
+/// 最終地圖上顯示的垃圾車清單 Provider。
+/// 邏輯：
+/// 1. 若設定了 [targetTime]，則從資料庫查詢該時間點的班表。
+/// 2. 若設定了 [predictionDuration]，則計算未來時間點並從資料庫查詢。
+/// 3. 若皆無設定，則顯示 [garbageTrucksProvider] 抓取到的即時動態。
 final predictedTrucksProvider = FutureProvider<List<GarbageTruck>>((ref) async {
   final realTimeTrucks = ref.watch(garbageTrucksProvider);
   final duration = ref.watch(predictionDurationProvider);
@@ -182,7 +189,7 @@ final predictedTrucksProvider = FutureProvider<List<GarbageTruck>>((ref) async {
     sourceLabel = isApiData ? '資料來源: 雲端 API (即時)' : '資料來源: 資料庫 (API 攔截/沒車)';
   }
 
-  // 修正：使用 Future.microtask 延遲更新另一個 Provider，避免初始化期間修改衝突
+  // 非同步更新標籤，避免與 build 過程衝突
   final finalLabel = '$sourceLabel | 顯示筆數: ${result.length}';
   Future.microtask(() {
     ref.read(sourceInfoProvider.notifier).setInfo(finalLabel);
@@ -196,16 +203,15 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
 
   @override
   List<GarbageTruck> build() {
-    // 偵聽城市選擇，當切換城市時重新觸發 build
+    // 監控城市切換，一旦改變則執行同步與重新整理
     final city = ref.watch(citySelectionProvider);
-    
-    // 重設狀態，確保舊城市的資料不會留在畫面上
     state = [];
     
     Future.microtask(() async {
       final service = ref.read(garbageServiceProvider);
       ref.read(isSyncingProvider.notifier).setSyncing(true);
       try {
+        // 同步城市路線資料
         await service.syncDataIfNeeded(onProgress: (msg) {
           ref.read(syncProgressProvider.notifier).setProgress(msg);
         });
@@ -223,11 +229,13 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
     return [];
   }
 
+  /// 更新本地資料庫筆數統計。
   Future<void> _updateCount(String city) async {
     final count = await DatabaseService().getTotalCount(city);
     ref.read(routeDataCountProvider.notifier).setCount(count);
   }
 
+  /// 重新整理即時車輛動態。
   Future<void> refresh() async {
     final city = ref.read(citySelectionProvider);
     final service = ref.read(garbageServiceProvider);
@@ -240,17 +248,17 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
     }
   }
 
+  /// 強制從雲端或本地來源重新同步所有路線點位，並更新資料庫。
   Future<void> forceUpdateRouteData() async {
     final city = ref.read(citySelectionProvider);
     final service = ref.read(garbageServiceProvider);
     
-    // 檢查目前是否處於「預測模式」
     final targetTime = ref.read(targetTimeProvider);
     final duration = ref.read(predictionDurationProvider);
     final isPrediction = targetTime != null || duration != Duration.zero;
 
     if (isPrediction) {
-      // 預測模式：重新從 JSON 同步資料庫 (針對台中市則是讀取 0_臺中市定時定點垃圾收運地點.JSON)
+      // 預測模式下，強制觸發資料庫重新同步
       ref.read(isSyncingProvider.notifier).setSyncing(true);
       try {
         await DatabaseService().updateVersion('force_refresh_$city', city);
@@ -258,17 +266,17 @@ class GarbageTrucksNotifier extends Notifier<List<GarbageTruck>> {
           ref.read(syncProgressProvider.notifier).setProgress(msg);
         });
         await _updateCount(city);
-        // 使 FutureProvider 重新計算以反映資料庫變更
         ref.invalidate(predictedTrucksProvider);
       } finally {
         ref.read(isSyncingProvider.notifier).setSyncing(false);
       }
     } else {
-      // 即時模式：重新抓取線上車輛資料 (API)
+      // 即時模式下，僅重新抓取車輛位置
       await refresh();
     }
   }
 
+  /// 啟動 30 秒一次的定期輪詢計時器。
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 30), (timer) => refresh());

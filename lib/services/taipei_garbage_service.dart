@@ -9,8 +9,9 @@ import 'database_service.dart';
 import 'ntpc_garbage_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+/// 台北市垃圾清運服務類別，支援從 API 獲取即時位置並同步清運班表。
 class TaipeiGarbageService extends BaseGarbageService {
-  // 台北市即時位置 API (JSON 格式)
+  /// 台北市垃圾車即時位置與路線 API 連結 (JSON 格式)
   static const String apiUrl = 'https://data.taipei/api/v1/dataset/a6e90031-7ec4-4089-afb5-361a4efe7202?scope=resourceAquire';
 
   final DatabaseService _dbService = DatabaseService();
@@ -19,6 +20,8 @@ class TaipeiGarbageService extends BaseGarbageService {
   TaipeiGarbageService({required super.localSourceDir, http.Client? client}) 
       : _client = client ?? http.Client();
 
+  /// 同步台北市清運點位資料。
+  /// 優先從 API 獲取，失敗則嘗試從本地 CSV 恢復。
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -49,6 +52,7 @@ class TaipeiGarbageService extends BaseGarbageService {
     }
   }
 
+  /// 統一時間格式為 HH:mm。
   String _formatTime(String timeRaw) {
     String raw = timeRaw.replaceAll(':', '').trim();
     if (raw.length == 4) {
@@ -61,6 +65,7 @@ class TaipeiGarbageService extends BaseGarbageService {
     return timeRaw.contains(':') ? timeRaw : '00:00';
   }
 
+  /// 從 API 同步台北市路線點位。
   Future<bool> _syncFromApi(void Function(String)? onProgress) async {
     try {
       final String syncUrl = '$apiUrl&limit=100000';
@@ -75,6 +80,7 @@ class TaipeiGarbageService extends BaseGarbageService {
           results = decoded;
         }
 
+        // 預期台北市應有超過 1100 個清運點
         if (results.length > 1100) {
           onProgress?.call('從 API 獲取 ${results.length} 筆資料，準備寫入資料庫...');
           await _dbService.clearAllRoutePoints('taipei');
@@ -115,6 +121,7 @@ class TaipeiGarbageService extends BaseGarbageService {
     return false;
   }
 
+  /// 從本地 CSV 匯入台北市資料 (備援方案)。
   Future<bool> _importFromLocalCSV(void Function(String)? onProgress) async {
     try {
       final dir = Directory(localSourceDir);
@@ -175,10 +182,10 @@ class TaipeiGarbageService extends BaseGarbageService {
     }
   }
 
+  /// 獲取台北市目前的垃圾車位置資訊。
   @override
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
-      // 增加 limit 並加入時間戳記以避開快取
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
       final String requestUrl = '$apiUrl&limit=20000&_t=$timestamp';
       
@@ -200,8 +207,6 @@ class TaipeiGarbageService extends BaseGarbageService {
           final String latStr = item['緯度']?.toString() ?? item['latitude']?.toString() ?? '0';
           final String lonStr = item['經度']?.toString() ?? item['longitude']?.toString() ?? '0';
           
-          // 台北市 API 的 _importdate 通常是靜態的。
-          // 對於即時位置，我們應該優先使用 API 內的點位時間，若無則使用當前時間。
           DateTime updateTime = now;
           final String? timeField = item['點位日期時間']?.toString() ?? item['time']?.toString();
           if (timeField != null) {
@@ -224,16 +229,17 @@ class TaipeiGarbageService extends BaseGarbageService {
       DatabaseService.log('台北市即時位置獲取失敗', error: e);
     }
     
+    // 若即時 API 失敗，回傳班表預測
     final now = DateTime.now();
     return await findTrucksByTime(now.hour, now.minute);
   }
 
+  /// 根據指定時間查詢台北市班表。
   @override
   Future<List<GarbageTruck>> findTrucksByTime(int hour, int minute) async {
     final points = await _dbService.findPointsByTime(hour, minute, 'taipei');
     final now = DateTime.now();
     return points.map((p) {
-      // 嘗試將 "HH:mm" 解析為當天的 DateTime
       DateTime scheduledTime = now;
       try {
         final parts = p.arrivalTime.split(':');
@@ -252,6 +258,7 @@ class TaipeiGarbageService extends BaseGarbageService {
     }).toList();
   }
 
+  /// 獲取特定路線編號的所有點位清單。
   @override
   Future<List<GarbageRoutePoint>> getRouteForLine(String lineId) async {
     return await _dbService.getRoutePoints(lineId, 'taipei');

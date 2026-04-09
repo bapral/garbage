@@ -7,12 +7,14 @@ import 'package:latlong2/latlong.dart';
 import 'package:meta/meta.dart';
 import 'package:flutter/foundation.dart';
 
+/// 資料庫服務類別，負責本地 SQLite 資料庫的初始化、維護與查詢。
+/// 採用單例模式 (Singleton) 確保全域只有一個資料庫實體。
 class DatabaseService {
   static DatabaseService _instance = DatabaseService._internal();
   factory DatabaseService() => _instance;
   DatabaseService._internal();
 
-  // 提供測試時重置單例的方法
+  /// 提供測試時重置單例的方法，主要用於單元測試環境。
   @visibleForTesting
   static void resetInstance() {
     _db?.close();
@@ -21,15 +23,17 @@ class DatabaseService {
   }
 
   static Database? _db;
-  static const String tableName = 'route_points';
-  static const String metaTable = 'metadata';
+  static const String tableName = 'route_points'; // 儲存清運點位的資料表
+  static const String metaTable = 'metadata';     // 儲存版本與中繼資料的資料表
   
-  // 允許自定義資料庫路徑 (預設為檔案路徑)
+  // 允許自定義資料庫路徑 (預設為檔案路徑)，便於測試使用記憶體資料庫
   static String? _customPath;
   @visibleForTesting
   static set customPath(String? path) => _customPath = path;
 
-  // 日誌記錄
+  /// 記錄日誌訊息。
+  /// [message] 為主要訊息，[error] 與 [stackTrace] 為選用的錯誤資訊。
+  /// 訊息會同時輸出至偵錯主機 (debugPrint) 並非同步寫入本地檔案。
   static Future<void> log(String message, {Object? error, StackTrace? stackTrace}) async {
     final now = DateTime.now();
     final logStr = '[$now] $message${error != null ? '\nError: $error' : ''}${stackTrace != null ? '\nStackTrace: $stackTrace' : ''}\n---\n';
@@ -39,6 +43,8 @@ class DatabaseService {
     _writeLogToFile(logStr);
   }
 
+  /// 將日誌內容寫入實體檔案。
+  /// 根據作業系統 (Windows/Linux/macOS) 決定不同的日誌存儲路徑。
   static Future<void> _writeLogToFile(String logStr) async {
     try {
       String? logPath;
@@ -60,12 +66,15 @@ class DatabaseService {
     }
   }
 
+  /// 取得資料庫實體。如果尚未初始化，則會呼叫 [_initDb] 進行初始化。
   Future<Database> get db async {
     if (_db != null) return _db!;
     _db = await _initDb();
     return _db!;
   }
 
+  /// 初始化資料庫。
+  /// 包含針對桌面平台 (Windows/Linux) 的 FFI 初始化，以及資料表的建立與版本升級。
   Future<Database> _initDb() async {
     try {
       await log('Initializing database...');
@@ -81,9 +90,10 @@ class DatabaseService {
       
       final db = await openDatabase(
         path,
-        version: 2, // 升級版本以套用 city 欄位
+        version: 2, // 升級版本以套用 city 欄位 (版本 1 無此欄位)
         onCreate: (db, version) async {
           await log('Creating database tables...');
+          // 建立清運點位表與索引，最佳化查詢效能
           await db.execute('CREATE TABLE $tableName (lineId TEXT, lineName TEXT, rank INTEGER, name TEXT, latitude REAL, longitude REAL, arrivalTime TEXT, city TEXT)');
           await db.execute('CREATE TABLE $metaTable (key TEXT PRIMARY KEY, value TEXT)');
           await db.execute('CREATE INDEX idx_lineId ON $tableName (lineId)');
@@ -94,6 +104,7 @@ class DatabaseService {
         onUpgrade: (db, oldVersion, newVersion) async {
           await log('Upgrading database from $oldVersion to $newVersion...');
           if (oldVersion < 2) {
+            // 從版本 1 升級至 2，補上城市區分欄位與索引
             await db.execute('ALTER TABLE $tableName ADD COLUMN city TEXT');
             await db.execute('CREATE INDEX idx_city ON $tableName (city)');
           }
@@ -108,22 +119,27 @@ class DatabaseService {
     }
   }
 
+  /// 獲取特定城市已儲存的資料版本 (通常為 App 版本)。
   Future<String?> getStoredVersion(String city) async {
     final database = await db;
     final List<Map<String, dynamic>> maps = await database.query(metaTable, where: 'key = ?', whereArgs: ['app_version_$city']);
     return maps.isNotEmpty ? maps.first['value'] : null;
   }
 
+  /// 更新特定城市的資料版本紀錄。
   Future<void> updateVersion(String version, String city) async {
     final database = await db;
     await database.insert(metaTable, {'key': 'app_version_$city', 'value': version}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
+  /// 刪除特定城市的所有路線點位資料。
   Future<void> clearAllRoutePoints(String city) async {
     final database = await db;
     await database.delete(tableName, where: 'city = ?', whereArgs: [city]);
   }
 
+  /// 批量存入路線點位資料。
+  /// [points] 為待存入的點位清單，[city] 為城市標籤。
   Future<void> saveRoutePoints(List<GarbageRoutePoint> points, String city) async {
     final database = await db;
     await database.transaction((txn) async {
@@ -139,7 +155,8 @@ class DatabaseService {
     });
   }
 
-  /// 原子操作：清空該城市的舊點位並存入新點位，防止同步期間出現空資料
+  /// 原子操作：清空該城市的舊點位並存入新點位。
+  /// 使用資料庫事務 (Transaction) 確保操作的完整性，防止同步期間出現資料不一致。
   Future<void> clearAndSaveRoutePoints(List<GarbageRoutePoint> points, String city) async {
     final database = await db;
     await database.transaction((txn) async {
@@ -156,6 +173,7 @@ class DatabaseService {
     });
   }
 
+  /// 取得總點位數。可依 [city] 過濾。
   Future<int> getTotalCount([String? city]) async {
     final database = await db;
     if (city != null) {
@@ -164,13 +182,16 @@ class DatabaseService {
     return Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM $tableName')) ?? 0;
   }
 
+  /// 檢查特定城市是否已有快取資料。
   Future<bool> hasData(String city) async => (await getTotalCount(city)) > 0;
 
+  /// 根據指定時間點查詢附近 20 分鐘內的點位。
+  /// [hour], [minute] 為指定時間，[city] 為城市。
+  /// 邏輯：抓取指定時間前 3 分鐘到後 17 分鐘內的資料。
   Future<List<GarbageRoutePoint>> findPointsByTime(int hour, int minute, String city) async {
     final database = await db;
-    // 抓取指定時間前 10 分鐘到後 20 分鐘內的資料，增加容錯性
-    final String start = _offsetTime(hour, minute, -10);
-    final String end = _offsetTime(hour, minute, 20);
+    final String start = _offsetTime(hour, minute, -3);
+    final String end = _offsetTime(hour, minute, 17);
     
     await log('正在查詢點位: city=$city, range=$start~$end');
     
@@ -185,12 +206,15 @@ class DatabaseService {
     )).toList();
   }
 
+  /// 計算時間偏移量並回傳 HH:mm 格式字串。
   String _offsetTime(int h, int m, int offset) {
     int total = h * 60 + m + offset;
     if (total < 0) total = 0; if (total > 1439) total = 1439;
     return '${(total ~/ 60).toString().padLeft(2, '0')}:${(total % 60).toString().padLeft(2, '0')}';
   }
 
+  /// 根據路線 ID (lineId) 取得該城市特定路線的所有點位。
+  /// 結果依序 (rank ASC) 排列。
   Future<List<GarbageRoutePoint>> getRoutePoints(String lineId, String city) async {
     final database = await db;
     final List<Map<String, dynamic>> maps = await database.query(

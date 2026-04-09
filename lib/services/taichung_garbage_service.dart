@@ -9,10 +9,11 @@ import 'ntpc_garbage_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart';
 
+/// 台中市垃圾清運服務類別，負責台中市清運路線與即時位置的處理。
 class TaichungGarbageService extends BaseGarbageService {
-  // 台中市定時定點路線 API (JSON)
+  /// 台中市定時定點路線 API (JSON 格式)
   static const String routeApiUrl = 'https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=68d1a87f-7baa-4b50-8408-c36a3a7eda68';
-  // 台中市垃圾及資源回收車動態資訊 API (JSON)
+  /// 台中市垃圾及資源回收車動態資訊 API (JSON 格式)
   static const String dynamicApiUrl = 'https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=c923ad20-2ec6-43b9-b3ab-54527e99f7bc';
 
   final DatabaseService _dbService = DatabaseService();
@@ -21,6 +22,12 @@ class TaichungGarbageService extends BaseGarbageService {
   TaichungGarbageService({required super.localSourceDir, http.Client? client}) 
       : _client = client ?? http.Client();
 
+  /// 同步台中市路線資料。
+  /// 台中市的同步邏輯較為特殊：
+  /// 1. 先從動態 API 獲取所有車輛的最新 GPS 位置。
+  /// 2. 讀取本地預載的班表 JSON 檔案。
+  /// 3. 比對班表中的車牌號碼與即時位置，將站點與當前車輛位置連結。
+  /// 4. 根據當前星期幾，選取正確的抵達時間存入資料庫。
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -53,7 +60,7 @@ class TaichungGarbageService extends BaseGarbageService {
         }
       }
 
-      // 2. 讀取本地 JSON 班表
+      // 2. 讀取本地 JSON 班表 (預期放置於本地資源目錄)
       onProgress?.call('讀取台中市本地班表 JSON...');
       final String jsonPath = join(localSourceDir, '0_臺中市定時定點垃圾收運地點.JSON');
       final File jsonFile = File(jsonPath);
@@ -67,17 +74,17 @@ class TaichungGarbageService extends BaseGarbageService {
       onProgress?.call('正在解析台中市路線: ${scheduleData.length} 筆...');
       
       List<GarbageRoutePoint> allPoints = [];
-      int dayOfWeek = DateTime.now().weekday; // 1-7 (Mon-Sun)
+      int dayOfWeek = DateTime.now().weekday; // 1-7 (星期一至星期日)
       
       for (int i = 0; i < scheduleData.length; i++) {
         final item = scheduleData[i];
         final String carNo = item['car_licence']?.toString() ?? '';
         final String locationName = item['caption']?.toString() ?? '未知地點';
         
-        // 獲取當天的抵達時間 (g_d[1-7]_time_s)
+        // 獲取當天的抵達時間欄位 (例如 g_d1_time_s)
         String arrivalTime = item['g_d${dayOfWeek}_time_s']?.toString() ?? '';
         if (arrivalTime.isEmpty) {
-          // 如果當天沒收，找第一個有收的時間作為代表
+          // 如果當天沒收運，尋找該站點有收運的第一個時間點作為參考
           for (int d = 1; d <= 7; d++) {
             arrivalTime = item['g_d${d}_time_s']?.toString() ?? '';
             if (arrivalTime.isNotEmpty) break;
@@ -86,7 +93,7 @@ class TaichungGarbageService extends BaseGarbageService {
 
         if (arrivalTime.isEmpty) continue;
 
-        // 嘗試從剛才建立的對照表中找出這台車的「可能位置」
+        // 嘗試從即時位置對照表中找出這台車的位置，若無則使用市中心預設座標
         LatLng pos = carPositions[carNo] ?? const LatLng(24.147, 120.673);
 
         allPoints.add(GarbageRoutePoint(
@@ -111,6 +118,7 @@ class TaichungGarbageService extends BaseGarbageService {
     }
   }
 
+  /// 獲取台中市目前的垃圾車位置資訊。
   @override
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
@@ -130,7 +138,7 @@ class TaichungGarbageService extends BaseGarbageService {
           DateTime updateTime = now;
           final String? timeStr = item['time']?.toString();
           if (timeStr != null && timeStr.contains('T')) {
-            // 格式: 20260406T213649
+            // 解析格式: 20260406T213649
             try {
               final String formatted = '${timeStr.substring(0, 4)}-${timeStr.substring(4, 6)}-${timeStr.substring(6, 8)} ${timeStr.substring(9, 11)}:${timeStr.substring(11, 13)}:${timeStr.substring(13, 15)}';
               updateTime = DateTime.tryParse(formatted) ?? now;
@@ -153,10 +161,12 @@ class TaichungGarbageService extends BaseGarbageService {
       DatabaseService.log('台中市即時位置獲取失敗', error: e);
     }
     
+    // 若即時位置失敗，回傳班表預測
     final now = DateTime.now();
     return await findTrucksByTime(now.hour, now.minute);
   }
 
+  /// 根據指定時間查詢台中市班表。
   @override
   Future<List<GarbageTruck>> findTrucksByTime(int hour, int minute) async {
     final points = await _dbService.findPointsByTime(hour, minute, 'taichung');
@@ -182,6 +192,7 @@ class TaichungGarbageService extends BaseGarbageService {
     }).toList();
   }
 
+  /// 獲取特定車號的所有清運點位。
   @override
   Future<List<GarbageRoutePoint>> getRouteForLine(String lineId) async {
     return await _dbService.getRoutePoints(lineId, 'taichung');

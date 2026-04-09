@@ -1,12 +1,25 @@
 import 'package:latlong2/latlong.dart';
 
+/// [GarbageRoutePoint] 類別代表垃圾車清運點的資訊。
+/// 記錄了清運點的名稱、順序、位置及預計抵達時間等。
 class GarbageRoutePoint {
-  final String lineId;      // 路線 ID
-  final String lineName;    // 路線名稱
-  final int rank;           // 順序
-  final String name;        // 清運點名稱
-  final LatLng position;    // 座標
-  final String arrivalTime; // 預計抵達時間 (例如 "17:30")
+  /// 路線 ID，用於關聯特定清運路線
+  final String lineId;
+  
+  /// 路線名稱
+  final String lineName;
+  
+  /// 在該清運路線中的順序 (排名)
+  final int rank;
+  
+  /// 清運點的名稱 (例如: "中山路 10 號")
+  final String name;
+  
+  /// 清運點的經緯度座標
+  final LatLng position;
+  
+  /// 預計抵達時間 (格式通常為 "HH:mm"，例如 "17:30")
+  final String arrivalTime;
 
   GarbageRoutePoint({
     required this.lineId,
@@ -17,6 +30,10 @@ class GarbageRoutePoint {
     required this.arrivalTime,
   });
 
+  /// 從 JSON 格式轉換為 [GarbageRoutePoint] 物件的工廠方法。
+  /// 
+  /// [json] 為 API 回傳的 Map 資料。
+  /// 此方法會自動處理各種可能的欄位名稱 (如 `lineid`, `rank`, `latitude` 等)，並進行基礎的類型轉換與預設值設定。
   factory GarbageRoutePoint.fromJson(Map<String, dynamic> json) {
     return GarbageRoutePoint(
       lineId: json['lineid'] ?? '',

@@ -7,10 +7,11 @@ import 'database_service.dart';
 import 'ntpc_garbage_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+/// 台南市垃圾清運服務類別，負責台南市路線同步與車輛位置查詢。
 class TainanGarbageService extends BaseGarbageService {
-  // 台南市垃圾車 GPS API
+  /// 台南市垃圾車 GPS API 連結 (JSON 格式)
   static const String dynamicApiUrl = 'https://soa.tainan.gov.tw/Api/Service/Get/2c8a70d5-06f2-4353-9e92-c40d33bcd969';
-  // 台南市清運點資料 API (班表)
+  /// 台南市清運點資料 API 連結 (班表 JSON 格式)
   static const String routeApiUrl = 'https://soa.tainan.gov.tw/Api/Service/Get/84df8cd6-8741-41ed-919c-5105a28ecd6d';
 
   final DatabaseService _dbService = DatabaseService();
@@ -19,6 +20,8 @@ class TainanGarbageService extends BaseGarbageService {
   TainanGarbageService({required super.localSourceDir, http.Client? client}) 
       : _client = client ?? http.Client();
 
+  /// 同步台南市路線資料。
+  /// 從 API 讀取 JSON 並解析各欄位（經緯度、路線 ID、清運點名稱與時間）。
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -76,6 +79,7 @@ class TainanGarbageService extends BaseGarbageService {
     }
   }
 
+  /// 獲取台南市目前的垃圾車位置資訊。
   @override
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
@@ -105,12 +109,12 @@ class TainanGarbageService extends BaseGarbageService {
       DatabaseService.log('台南市即時位置獲取失敗', error: e);
     }
     
-    // 失敗則回傳預測資料
+    // 若即時 API 失敗，退回班表預測
     final now = DateTime.now();
     return await findTrucksByTime(now.hour, now.minute);
   }
 
-
+  /// 根據指定時間查詢台南市班表。
   @override
   Future<List<GarbageTruck>> findTrucksByTime(int hour, int minute) async {
     final points = await _dbService.findPointsByTime(hour, minute, 'tainan');
@@ -135,6 +139,7 @@ class TainanGarbageService extends BaseGarbageService {
     }).toList();
   }
 
+  /// 獲取特定路線編號的所有點位清單。
   @override
   Future<List<GarbageRoutePoint>> getRouteForLine(String lineId) async {
     return await _dbService.getRoutePoints(lineId, 'tainan');
