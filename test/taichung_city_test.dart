@@ -1,3 +1,10 @@
+/// [整體程式說明]: 台中市垃圾車服務邏輯測試，驗證即時動態 API 解析、班表資料庫同步以及時間過濾邏輯的正確性。
+/// [執行順序說明]:
+/// 1. 初始化 sqflite_ffi 與 PackageInfo 模擬環境，並建立臨時測試目錄。
+/// 2. 測試動態解析：使用 ManualMockClient 注入台中市動態 JSON，驗證 fetchTrucks 是否能正確轉換為 GarbageTruck 物件（含座標與時間轉換）。
+/// 3. 測試班表同步：在臨時目錄建立模擬的班表 JSON 檔，呼叫 syncDataIfNeeded 並驗證資料庫總筆數，隨後執行時間預測查詢。
+/// 4. 測試時間過濾：插入測試點位，驗證 findTrucksByTime 是否嚴格遵循前後 20 分鐘的過濾規則。
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:ntpc_garbage_map/services/taichung_garbage_service.dart';
@@ -65,7 +72,9 @@ void main() {
   });
 
   group('TaichungGarbageService 測試', () {
+    /// 台中市垃圾車服務測試：驗證動態 API 解析、班表同步及時間過濾邏輯
     test('fetchTrucks 應正確解析台中市動態 API JSON', () async {
+      /// 測試動態解析：驗證是否能正確解析台中市政府動態 API 回傳的 JSON 格式並轉換為 GarbageTruck 物件
       mockClient.mockResponse = json.encode([
         {
           "lineid": "123",
@@ -88,6 +97,7 @@ void main() {
     });
 
     test('syncDataIfNeeded 應能處理本地 JSON 並寫入資料庫', () async {
+      /// 測試同步邏輯：驗證是否能正確讀取本地的 JSON 班表資料、解析並存入資料庫，以及後續的預測查詢
       final mockJsonFile = File(p.join(tempDir, '0_臺中市定時定點垃圾收運地點.JSON'));
       final mockSchedule = [
         {
@@ -126,6 +136,7 @@ void main() {
     });
 
     test('findTrucksByTime 應符合 20 分鐘過濾規則', () async {
+      /// 測試時間過濾：驗證台中市服務的時間過濾邏輯，確保僅回傳搜尋時間前後 20 分鐘內的站點
       final db = DatabaseService();
       await db.saveRoutePoints([
         GarbageRoutePoint(lineId: 'T1', lineName: '台中線', rank: 1, name: '點A', position: const LatLng(24, 120), arrivalTime: '09:00'),

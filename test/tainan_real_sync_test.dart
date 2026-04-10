@@ -1,3 +1,10 @@
+/// [整體程式說明]: 台南市真實同步測試，驗證從真實 API 抓取台南市清運點資料（應超過 10000 筆）並存入資料庫，以及獲取即時 GPS 車輛的穩定性。
+/// [執行順序說明]:
+/// 1. 初始化測試環境與臨時目錄。
+/// 2. 測試真實同步：執行 syncDataIfNeeded，驗證資料庫中的台南市點位總數是否符合預期門檻。
+/// 3. 測試特定路線：獲取路線 18 的點位並斷言其內容。
+/// 4. 測試真實 GPS：呼叫 fetchTrucks 並驗證是否能成功抓取到即時車輛（含座標與車號）。
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:ntpc_garbage_map/services/tainan_garbage_service.dart';
@@ -45,6 +52,7 @@ void main() {
   });
 
   test('台南市真實同步測試：從 API 抓取並存入資料庫', () async {
+    /// 測試真實同步：驗證台南市資料同步後，資料庫中的總點位數是否符合大於 10000 筆的預期門檻
     print('開始同步台南市資料...');
     await service.syncDataIfNeeded(onProgress: (msg) {
       print('進度: $msg');
@@ -65,6 +73,7 @@ void main() {
   }, timeout: const Timeout(Duration(minutes: 5)));
 
   test('台南市真實 GPS 測試：從 API 抓取即時車輛', () async {
+    /// 測試真實 GPS：驗證是否能成功抓取即時車輛資料，確保座標與車號欄位有效
     print('開始抓取台南市即時 GPS...');
     final trucks = await service.fetchTrucks();
     print('獲取到 ${trucks.length} 台車輛');

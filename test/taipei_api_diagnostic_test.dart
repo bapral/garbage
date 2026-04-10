@@ -1,3 +1,11 @@
+/// [整體程式說明]: 台北市新版 API 診斷：分析中文欄位結構與資料正確性，確保服務能正確提取車號、地點、座標及匯入日期。
+/// [執行順序說明]:
+/// 1. 向台北市新版 API 發送請求並包含 User-Agent Header。
+/// 2. 驗證回應狀態碼並解析 JSON 結構（支援 Map 或 List 格式）。
+/// 3. 深入分析首筆資料，檢查關鍵中文欄位（如「車號」、「地點」等）的存在性。
+/// 4. 診斷 _importdate 內部結構，驗證日期字串的解析相容性。
+/// 5. 執行座標解析測試，驗證經緯度欄位是否能正確轉換為 double。
+
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -10,7 +18,9 @@ void main() {
   };
 
   group('Taipei City New API Diagnostic (Chinese Fields)', () {
+    /// 台北市新版 API 診斷：分析中文欄位結構與資料正確性
     test('Fetch and analyze Taipei Garbage Truck API with Chinese Fields', () async {
+      /// 測試獲取並分析：驗證台北市垃圾車 API 是否包含預期的中文欄位（如「車號」、「地點」等）以及 _importdate 結構
       final url = TaipeiGarbageService.apiUrl;
       print('--- 台北市新 API 深度診斷開始 ---');
       print('目標 URL: $url');

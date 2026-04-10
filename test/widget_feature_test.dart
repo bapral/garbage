@@ -1,3 +1,11 @@
+/// [整體程式說明]: 功能 UI 元件測試：驗證預測按鈕、最近站點尋找按鈕以及預測對話框的互動邏輯與顯示。
+/// [執行順序說明]:
+/// 1. 使用 MockGarbageTrucksNotifier 覆蓋 Provider 以模擬單筆垃圾車資料。
+/// 2. 啟動 MapScreen 並等待載入。
+/// 3. 檢查 AppBar 上預測按鈕（時鐘圖示）與尋找最近按鈕（導航圖示）的存在性。
+/// 4. 測試預測按鈕：點擊後彈出功能選擇對話框，選擇「預測 X 小時 Y 分後」。
+/// 5. 驗證預測時間輸入對話框是否顯示，並測試取消按鈕的功能。
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +33,7 @@ class MockGarbageTrucksNotifier extends GarbageTrucksNotifier {
 
 void main() {
   testWidgets('Feature UI Elements Test', (WidgetTester tester) async {
+    /// 功能 UI 元件測試：驗證預測按鈕、最近站點尋找按鈕以及預測對話框的互動邏輯與顯示
     await tester.pumpWidget(
       ProviderScope(
         overrides: [

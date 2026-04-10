@@ -1,3 +1,10 @@
+/// [整體程式說明]: 台南市垃圾車服務邏輯測試，驗證即時 GPS API 解析、清運點資料庫同步以及 API 失敗時的自動降級預測機制。
+/// [執行順序說明]:
+/// 1. 初始化測試環境，包含資料庫工廠、模擬 PackageInfo 與臨時測試目錄。
+/// 2. 測試 GPS 解析：注入模擬的台南市 GPS JSON，驗證 fetchTrucks 是否能正確提取車號、座標與地點資訊。
+/// 3. 測試班表同步：注入模擬的清運點 JSON，呼叫 syncDataIfNeeded 並驗證資料庫存入筆數與時間預測查詢的準確性。
+/// 4. 測試 API 降級：模擬 API 回傳 HTTP 500 錯誤，驗證系統是否能自動切換至資料庫查詢並回傳標示為「預定車」的預測車輛。
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:ntpc_garbage_map/services/tainan_garbage_service.dart';
@@ -62,7 +69,9 @@ void main() {
   });
 
   group('TainanGarbageService 測試', () {
+    /// 台南市垃圾車服務測試：驗證即時 GPS API 解析、清運點同步及 API 失敗時的降級處理
     test('fetchTrucks 應正確解析台南市動態 GPS API JSON', () async {
+      /// 測試動態解析：驗證是否能正確解析台南市政府動態 GPS API 回傳的 JSON 格式並轉換為 GarbageTruck 物件
       mockClient.mockResponse = json.encode({
         "data": [
           {
@@ -85,6 +94,7 @@ void main() {
     });
 
     test('syncDataIfNeeded 應從 API 同步清運點至資料庫', () async {
+      /// 測試同步邏輯：驗證是否能從 API 成功同步清運點班表資料並存入資料庫，以及後續的預測查詢功能
       mockClient.mockResponse = json.encode({
         "data": [
           {
@@ -112,6 +122,7 @@ void main() {
     });
 
     test('當 API 失敗時，fetchTrucks 應降級至資料庫查詢 (回傳預測車)', () async {
+      /// 測試降級邏輯：驗證當台南市即時 API 連線失敗（如 HTTP 500）時，系統是否能自動降級至資料庫查詢並回傳預測車輛
       // 先同步一筆資料進資料庫
       mockClient.mockResponse = json.encode({
         "data": [

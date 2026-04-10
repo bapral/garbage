@@ -1,3 +1,11 @@
+/// [整體程式說明]: 完整功能 UI 整合測試，驗證地圖介面、標記點資訊卡、預測選單以及導航功能等核心 UI 互動流程。
+/// [執行順序說明]:
+/// 1. 使用 MockGarbageTrucksNotifier 覆蓋 Provider 以模擬靜態測試資料。
+/// 2. 啟動 MapScreen 並等待 Widget 樹建構完成。
+/// 3. 模擬點擊地圖上的垃圾車標記點，驗證資訊卡顯示內容（如車號）。
+/// 4. 模擬點擊預測選單按鈕，驗證預測功能對話框是否正確彈出。
+/// 5. 驗證導航按鈕的存在並模擬點擊操作。
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,6 +41,7 @@ void main() {
   });
 
   testWidgets('Full Feature UI Test', (WidgetTester tester) async {
+    /// 全功能 UI 測試：驗證地圖啟動、點位資訊卡顯示、預測功能選單及導航按鈕等核心 UI 元件
     await tester.pumpWidget(
       ProviderScope(
         overrides: [

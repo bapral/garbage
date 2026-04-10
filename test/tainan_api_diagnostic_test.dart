@@ -1,9 +1,17 @@
+/// [整體程式說明]: 台南市政府開放資料 API 真實連線診斷測試，驗證新版即時 GPS 與清運點（班表）API 的連通性與資料格式。
+/// [執行順序說明]:
+/// 1. 向台南市即時 GPS API 發送 GET 請求。
+/// 2. 驗證 HTTP 狀態碼與 JSON 中的 success 旗標。
+/// 3. 解析 data 欄位，統計筆數並輸出首筆記錄的所有欄位內容。
+/// 4. 向台南市清運點 API 發送 GET 請求，執行類似的驗證流程並輸出班表欄位範例。
+
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('診斷：台南市即時 GPS API 真實連線測試 (新網址)', () async {
+    /// 測試 GPS API：驗證台南市即時 GPS 資料的獲取與 JSON 欄位結構是否正確
     const String url = 'https://soa.tainan.gov.tw/Api/Service/Get/2c8a70d5-06f2-4353-9e92-c40d33bcd969';
     
     print('\n--- 台南市即時 GPS API 診斷 ---');
@@ -43,6 +51,7 @@ void main() {
   });
 
   test('診斷：台南市清運點 (班表) API 真實連線測試 (新網址)', () async {
+    /// 測試班表 API：驗證台南市班表 API 的連通性並輸出範例欄位以供檢視
     const String url = 'https://soa.tainan.gov.tw/Api/Service/Get/84df8cd6-8741-41ed-919c-5105a28ecd6d';
     
     print('\n--- 台南市清運點 API 診斷 ---');

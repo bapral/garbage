@@ -1,3 +1,10 @@
+/// [整體程式說明]: 驗證各城市垃圾車預測模式的時間範圍邏輯（前5分鐘至後20分鐘），確保點位在正確的時間視窗內可見。
+/// [執行順序說明]:
+/// 1. 初始化記憶體資料庫。
+/// 2. 插入特定時間的測試垃圾車路線點位。
+/// 3. 模擬不同「現在時間」並查詢資料庫。
+/// 4. 斷言查詢結果是否符合「前5後20」的邊界條件。
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ntpc_garbage_map/models/city_config.dart';
 import 'package:ntpc_garbage_map/services/database_service.dart';
@@ -13,6 +20,7 @@ void main() {
   databaseFactory = databaseFactoryFfi;
 
   group('各城市預測模式時間範圍驗證 (前5後20)', () {
+    /// 各城市預測模式時間範圍驗證：確保點位在給定的 25 分鐘視窗（前5後20）內可被正確檢索
     late DatabaseService dbService;
 
     setUp(() async {
@@ -22,6 +30,7 @@ void main() {
       await dbService.db;
     });
 
+    /// 插入測試資料到指定城市的資料庫
     Future<void> insertTestData(String city, String time) async {
       await dbService.saveRoutePoints([
         GarbageRoutePoint(
@@ -36,6 +45,7 @@ void main() {
     }
 
     test('驗證 25 分鐘可見窗口 (前5後20邏輯)', () async {
+      /// 測試點位可見性：驗證 12:00 的點位在 11:40 至 12:05 之間是否可見，並確認邊界外的不可見性
       final service = NtpcGarbageService(localSourceDir: 'tmp');
       
       // 測試點：12:00
@@ -67,6 +77,7 @@ void main() {
     });
 
     test('驗證所有城市皆套用相同 前5後20 邏輯', () async {
+      /// 測試多城市通用邏輯：驗證新北市、台北市及高雄市是否均採用相同的前5後20時間預測邏輯
       final cities = ['ntpc', 'taipei', 'kaohsiung'];
       for (var city in cities) {
         await dbService.clearAllRoutePoints(city);

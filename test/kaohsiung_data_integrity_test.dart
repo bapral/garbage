@@ -1,3 +1,10 @@
+/// [整體程式說明]: 高雄市垃圾車資料完整性深度測試，驗證服務是否能正確過濾包含無效座標或缺失時間的異常資料。
+/// [執行順序說明]:
+/// 1. 初始化測試環境與模擬套件資訊。
+/// 2. 建構包含正常、座標錯誤（非數值）及時間缺失（null）的模擬 JSON 資料。
+/// 3. 執行資料同步流程並觸發解析。
+/// 4. 查詢資料庫總筆數，斷言僅有正常資料被存入，確保資料庫品質。
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -23,6 +30,7 @@ void main() {
   });
 
   test('深度測試：應能過濾掉包含無效經緯度或時間的髒資料', () async {
+    /// 測試資料過濾：驗證 KaohsiungGarbageService 是否能識別並排除經緯度格式錯誤或時間缺失的非法資料列
     final corruptJson = [
       {
         "行政區": "正常區",

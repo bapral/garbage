@@ -1,3 +1,11 @@
+/// [整體程式說明]: TaipeiGarbageService 深度測試：驗證 CSV 解析細節、時間格式轉換（如 1630 轉 16:30）以及預測車輛的回傳邏輯。
+/// [執行順序說明]:
+/// 1. 初始化 sqflite_ffi 並設定記憶體資料庫。
+/// 2. 建立臨時目錄並寫入模擬的台北市格式 CSV 資料。
+/// 3. 執行同步流程，驗證資料庫存入筆數。
+/// 4. 測試 CSV 解析：驗證特定時間格式（1630）是否正確解析為 16:30，並確認座標解析準確。
+/// 5. 測試時間預測：驗證 findTrucksByTime 是否能正確回傳標示為「預定車」的台北市預測車輛。
+
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
@@ -13,6 +21,7 @@ void main() {
   databaseFactory = databaseFactoryFfi;
 
   group('TaipeiGarbageService Deep Tests', () {
+    /// TaipeiGarbageService 深度測試：驗證 CSV 解析細節與預測邏輯
     late DatabaseService dbService;
     late TaipeiGarbageService taipeiService;
     late Directory tempDir;
@@ -45,6 +54,7 @@ void main() {
     });
 
     test('CSV parsing should correctly handle Taipei City format (1630 -> 16:30)', () async {
+      /// 測試 CSV 解析：驗證台北市特有的時間格式（如 1630）是否能被正確解析為 16:30 並存入資料庫
       // 建立模擬台北市 CSV 資料
       // 行政區,里別,分隊,局編,車號,路線,車次,抵達時間,離開時間,地點,經度,緯度
       final csvContent = '''行政區,里別,分隊,局編,車號,路線,車次,抵達時間,離開時間,地點,經度,緯度
@@ -77,6 +87,7 @@ void main() {
     });
 
     test('findTrucksByTime should return Taipei predicted trucks correctly', () async {
+      /// 測試 findTrucksByTime：驗證台北市預測垃圾車的回傳邏輯是否正確，包含顯示名稱格式
       final csvContent = '''行政區,里別,分隊,局編,車號,路線,車次,抵達時間,離開時間,地點,經度,緯度
 士林區,天壽里,天母分隊,103-074,821-BT,天母-1,第1車,1900,1905,地點A,121.5,25.1
 ''';

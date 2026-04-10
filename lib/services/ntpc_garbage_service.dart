@@ -1,3 +1,16 @@
+/// [整體程式說明]
+/// 本文件定義了垃圾清運服務的基底架構以及新北市（NTPC）的具體實作。
+/// [BaseGarbageService] 確立了城市服務的統一介面，支援多城市擴充。
+/// [NtpcGarbageService] 則實作了新北市開放資料的 CSV 解析邏輯，
+/// 包含即時動態 API、路線班表 API 以及本地 CSV 備援方案。
+///
+/// [執行順序說明]
+/// 1. 呼叫 `syncDataIfNeeded`：比對版本後，優先從雲端 API 下載 CSV 路線資料。
+/// 2. 若 API 失敗，則嘗試讀取本地目錄中的 CSV 檔案進行匯入。
+/// 3. 解析過程中使用 `CsvToListConverter` 將字串轉換為 `GarbageRoutePoint` 並批次存入資料庫。
+/// 4. 呼叫 `fetchTrucks`：定期從 API 獲取最新的垃圾車 GPS 座標。
+/// 5. 若即時 API 暫無資料，則自動回退至 `findTrucksByTime` 進行班表推估。
+
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
@@ -9,32 +22,43 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:csv/csv.dart';
 import 'dart:io';
 
-/// 清運服務的基底抽象類別，定義了各城市服務必須實現的介面。
+/// [BaseGarbageService] 是所有城市垃圾清運服務的基底抽象類別。
+/// 
+/// 定義了統一的介面，確保各城市的實作皆包含資料同步、車輛抓取、時間查詢等功能。
 abstract class BaseGarbageService {
-  final String localSourceDir; // 本地資源目錄路徑
+  /// 存放該城市本地資源檔案（如預載 CSV/JSON）的目錄路徑。
+  final String localSourceDir; 
+  
+  /// 建構子：初始化服務基類。
   BaseGarbageService({required this.localSourceDir});
 
-  /// 檢查並在需要時同步資料庫。
+  /// 抽象方法：檢查版本並同步清運點位資料至資料庫。
+  /// [onProgress] 同步進度回調函式。
   Future<void> syncDataIfNeeded({void Function(String)? onProgress});
 
-  /// 獲取目前的車輛資訊 (可能是即時位置或班表)。
+  /// 抽象方法：獲取該城市目前的垃圾車動態（API 或 班表）。
+  /// 回傳即時 [GarbageTruck] 清單。
   Future<List<GarbageTruck>> fetchTrucks();
 
-  /// 根據指定時間查詢班表中的車輛。
+  /// 抽象方法：根據指定的時間點，從資料庫中檢索預計出現的垃圾車。
+  /// [hour] 小時，[minute] 分鐘。
   Future<List<GarbageTruck>> findTrucksByTime(int hour, int minute);
 
-  /// 根據路線編號獲取整條路線的點位清單。
+  /// 抽象方法：獲取特定路線編號的完整點位序列。
+  /// [lineId] 路線編號。
   Future<List<GarbageRoutePoint>> getRouteForLine(String lineId);
 }
 
-/// 新北市垃圾清運服務類別，支援從 API 獲取即時車輛位置與清運路線。
+/// [NtpcGarbageService] 負責新北市垃圾清運資料的處理。
+/// 
+/// 支援從新北市政府開放資料平台下載 CSV 格式的即時位置與路線班表。
 class NtpcGarbageService extends BaseGarbageService {
-  /// 新北市政府開放資料 - 垃圾車即時位置 (CSV 格式)
+  /// 即時位置 API (CSV 格式)
   static const String apiUrl = 'https://data.ntpc.gov.tw/api/datasets/28ab4122-60e1-4065-98e5-abccb69aaca6/csv';
-  /// 新北市政府開放資料 - 垃圾車清運路線 (CSV 格式)
+  /// 路線班表 API (CSV 格式)
   static const String routeUrl = 'https://data.ntpc.gov.tw/api/datasets/edc3ad26-8ae7-4916-a00b-bc6048d19bf8/csv';
 
-  /// 請求標頭，模擬瀏覽器請求以避免被伺服器阻擋。
+  /// 模擬瀏覽器的請求標頭，避免觸發政府伺服器的防爬蟲機制。
   static const Map<String, String> _headers = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     'Accept': 'text/csv, application/json',
@@ -44,46 +68,53 @@ class NtpcGarbageService extends BaseGarbageService {
   final DatabaseService _dbService = DatabaseService();
   final http.Client _client;
 
+  /// 建構子：初始化新北市服務。
+  /// [localSourceDir] 資源路徑，[client] 可選傳入 http.Client。
   NtpcGarbageService({required super.localSourceDir, http.Client? client}) 
       : _client = client ?? http.Client();
 
-  /// 同步新北市路線資料。
-  /// 優先嘗試從雲端 API 更新，失敗則退回讀取本地 CSV 檔案，最後使用模擬資料。
+  /// 新北市資料同步邏輯。
+  /// 
+  /// 優先級：雲端 API > 本地 CSV 備份 > 硬編碼模擬資料。
+  /// [onProgress] 進度回報。
   @override
   Future<void> syncDataIfNeeded({void Function(String)? onProgress}) async {
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
     final String currentAppVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
     final String? storedVersion = await _dbService.getStoredVersion('ntpc');
 
+    // 檢查是否需要更新
     bool needsUpdate = storedVersion != currentAppVersion || !(await _dbService.hasData('ntpc'));
 
     if (!needsUpdate) {
-      onProgress?.call('新北市資料已就緒...');
+      onProgress?.call('新北市快取資料已為最新...');
       return;
     }
 
-    onProgress?.call('正在嘗試從雲端更新新北市路線...');
+    onProgress?.call('嘗試從新北市政府 Open Data 更新路線...');
     bool apiSuccess = await _syncFromApi(onProgress);
 
     if (apiSuccess) {
       await _dbService.updateVersion(currentAppVersion, 'ntpc');
-      onProgress?.call('新北市路線已透過 API 更新完成！');
+      onProgress?.call('新北市路線同步完成 (雲端)。');
     } else {
-      onProgress?.call('API 更新失敗或筆數不足，嘗試從本地 CSV 恢復...');
+      onProgress?.call('雲端 API 同步失敗，嘗試讀取本地 CSV 備援檔案...');
       if (await _importFromLocalCSV(onProgress)) {
         await _dbService.updateVersion(currentAppVersion, 'ntpc');
-        onProgress?.call('新北市路線已從本地 CSV 更新完成。');
+        onProgress?.call('新北市路線同步完成 (本地 CSV)。');
       } else {
-        onProgress?.call('新北市本地 CSV 也無法讀取，嘗試使用模擬資料。');
+        onProgress?.call('本地 CSV 讀取失敗，使用內建模擬資料。');
         await _insertMockRouteData();
       }
     }
   }
 
-  /// 從新北市 API 同步路線資料。
-  /// 請求較大筆數 (size=100000) 以獲取完整路線，並解析 CSV。
+  /// 從雲端 API 下載並解析 CSV 路線資料。
+  /// [onProgress] 進度回報。
+  /// 回傳是否成功。
   Future<bool> _syncFromApi(void Function(String)? onProgress) async {
     try {
+      // 請求較大筆數以涵蓋所有路線
       final response = await _client.get(Uri.parse('$routeUrl?size=100000'), headers: _headers);
       
       if (response.statusCode == 200) {
@@ -93,11 +124,12 @@ class NtpcGarbageService extends BaseGarbageService {
           eol: '\n'
         ).convert(body);
 
-        // 如果資料量足夠 (預期新北市路線應超過 5000 筆)
+        // 檢查獲取筆數是否合理
         if (fields.length > 5000) {
-          onProgress?.call('從新北市路線 API 獲取 ${fields.length - 1} 筆點位，準備更新...');
+          onProgress?.call('獲取 ${fields.length - 1} 筆點位，正在清理舊資料並寫入...');
           await _dbService.clearAllRoutePoints('ntpc');
           
+          // 解析 CSV 標頭欄位索引
           final header = fields[0].map((e) => e.toString().toLowerCase().trim()).toList();
           int idxLineId = header.indexOf('lineid');
           int idxLat = header.indexOf('latitude');
@@ -124,7 +156,7 @@ class NtpcGarbageService extends BaseGarbageService {
               arrivalTime: row[idxTime].toString(),
             ));
 
-            // 每 1000 筆存入資料庫一次，優化寫入效能
+            // 每 1000 筆批次存入，兼顧效能與記憶體
             if (batch.length >= 1000) {
               await _dbService.saveRoutePoints(batch, 'ntpc');
               batch.clear();
@@ -135,12 +167,14 @@ class NtpcGarbageService extends BaseGarbageService {
         }
       }
     } catch (e) {
-      print('新北市 API 同步發生異常: $e');
+      DatabaseService.log('新北市 API 同步錯誤', error: e);
     }
     return false;
   }
 
-  /// 從本地 CSV 檔案匯入路線資料 (備援方案)。
+  /// 備援方案：從開發者預放在本地目錄的 CSV 匯入。
+  /// [onProgress] 進度回報。
+  /// 回傳是否成功。
   Future<bool> _importFromLocalCSV(void Function(String)? onProgress) async {
     try {
       final dir = Directory(localSourceDir);
@@ -151,6 +185,7 @@ class NtpcGarbageService extends BaseGarbageService {
       final List<List<dynamic>> fields = const CsvToListConverter(shouldParseNumbers: false, eol: '\n').convert(csvContent);
       if (fields.isEmpty) return false;
 
+      // 標頭解析邏輯
       final header = fields[0].map((e) => e.toString().toLowerCase().trim()).toList();
       int findIndex(List<String> keywords) {
         for (var k in keywords) {
@@ -184,7 +219,7 @@ class NtpcGarbageService extends BaseGarbageService {
         if (batch.length >= 1000) { 
           await _dbService.saveRoutePoints(batch, 'ntpc'); 
           batch.clear(); 
-          onProgress?.call('已匯入 $i / $totalRows 筆...');
+          onProgress?.call('已匯入 $i / $totalRows 筆 (本地)...');
         }
       }
       if (batch.isNotEmpty) await _dbService.saveRoutePoints(batch, 'ntpc');
@@ -194,8 +229,9 @@ class NtpcGarbageService extends BaseGarbageService {
     }
   }
 
-  /// 獲取新北市垃圾車的即時動態。
-  /// 嘗試從開放資料 API 下載最新 CSV 並解析。
+  /// 抓取新北市即時位置 CSV 並解析。
+  /// 
+  /// 回傳即時 [GarbageTruck] 清單，若失敗則回退至班表。
   @override
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
@@ -232,12 +268,11 @@ class NtpcGarbageService extends BaseGarbageService {
               updateTime: DateTime.tryParse(row[idxTime].toString()) ?? DateTime.now(),
             ));
           }
-          await DatabaseService.log('成功從 CSV 獲取即時車輛: ${trucks.length} 台');
           return trucks;
         }
       }
     } catch (e) {
-      await DatabaseService.log('即時 CSV 獲取失敗: $e');
+      DatabaseService.log('新北市即時 CSV 解析失敗，切換為班表查詢模式', error: e);
     }
 
     // 若 API 失敗，退回搜尋班表
@@ -245,7 +280,8 @@ class NtpcGarbageService extends BaseGarbageService {
     return await findTrucksByTime(now.hour, now.minute);
   }
 
-  /// 根據指定時間點查詢班表。
+  /// 根據指定時間點查詢新北市班表預估。
+  /// [hour] 小時，[minute] 分鐘。
   @override
   Future<List<GarbageTruck>> findTrucksByTime(int hour, int minute) async {
     final points = await _dbService.findPointsByTime(hour, minute, 'ntpc');
@@ -267,15 +303,16 @@ class NtpcGarbageService extends BaseGarbageService {
   }
 
   /// 獲取特定路線的點位清單。
+  /// [lineId] 路線編號。
   @override
   Future<List<GarbageRoutePoint>> getRouteForLine(String lineId) async {
     return await _dbService.getRoutePoints(lineId, 'ntpc');
   }
 
-  /// 插入模擬點位資料 (最終備援)。
+  /// 極端狀況下的模擬點位插入。
   Future<void> _insertMockRouteData() async {
     await _dbService.saveRoutePoints([
-      GarbageRoutePoint(lineId: '新店-01', lineName: '新店線', rank: 1, name: '中央八街口', position: LatLng(24.9742, 121.5284), arrivalTime: '20:30'),
+      GarbageRoutePoint(lineId: 'MOCK-01', lineName: '測試路線', rank: 1, name: '測試站點', position: LatLng(25.0, 121.5), arrivalTime: '20:30'),
     ], 'ntpc');
   }
 }

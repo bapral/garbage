@@ -1,3 +1,10 @@
+/// [整體程式說明]: 新北市政府開放資料 API 診斷測試，用於掃描並驗證多個可能的 Dataset ID (OID)，以確認哪一個包含即時垃圾車 JSON 資料。
+/// [執行順序說明]:
+/// 1. 定義新北市政府平台中多個可能包含垃圾車資料的 OID 列表。
+/// 2. 遍歷列表，針對每個 OID 發送 HTTP GET 請求並附加必要的 Header。
+/// 3. 驗證回應狀態碼並檢查內容是否為有效的 JSON 陣列。
+/// 4. 輸出獲取的資料筆數與首筆範例內容，協助開發者定位正確的資料源。
+
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -9,6 +16,7 @@ void main() {
   };
 
   test('Diagnostic: Scan multiple OIDs for Real-time Garbage Truck Data', () async {
+    /// 診斷測試：批次掃描多個 OID 以識別含有即時位置 JSON 資料的正確 API 連結
     // 掃描幾個可能的新北市垃圾車 OID
     final oids = [
       'EDC3AD26-8BD2-49A7-805D-0576461F297B', // 官方標示為車輛位置

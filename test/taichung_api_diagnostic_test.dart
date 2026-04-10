@@ -1,3 +1,10 @@
+/// [整體程式說明]: 台中市政府開放資料 API 真實連線診斷測試，驗證即時動態位置與路線班表資料的連通性、狀態碼及資料結構。
+/// [執行順序說明]:
+/// 1. 向台中市即時動態 API 發送帶有 limit=20000 參數的 GET 請求。
+/// 2. 驗證回應狀態碼並解析 JSON 陣列，輸出獲取的筆數與關鍵欄位（車號、座標、時間、地點）。
+/// 3. 向台中市路線班表 API 發送帶有 limit=100 參數的 GET 請求。
+/// 4. 驗證回應狀態碼並解析資料，輸出班表中的行政區、站點說明及時間欄位範例。
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -8,6 +15,7 @@ void main() {
     const String routeApiUrl = 'https://newdatacenter.taichung.gov.tw/api/v1/no-auth/resource.download?rid=68d1a87f-7baa-4b50-8408-c36a3a7eda68';
 
     test('診斷：台中市即時動態 API 連線', () async {
+      /// 測試即時動態 API：驗證連線能力並解析車輛位置 JSON，確認欄位格式是否符合實作要求
       print('\n--- 台中市即時動態 API 測試 ---');
       // 使用與實作一致的 20,000 筆上限測試
       final String url = '$dynamicApiUrl&limit=20000';
@@ -34,6 +42,7 @@ void main() {
     });
 
     test('診斷：台中市路線班表 API 連線', () async {
+      /// 測試路線班表 API：驗證班表 API 的連通性並輸出關鍵時間與站點欄位範例
       print('\n--- 台中市路線班表 API 測試 ---');
       final String url = '$routeApiUrl&limit=100'; // 診斷時僅抓取前 100 筆確認結構
       print('請求網址: $url');

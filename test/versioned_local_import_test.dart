@@ -1,3 +1,11 @@
+/// [整體程式說明]: 版本化本地匯入與 UI 測試：驗證資料同步的跳過機制、版本檢查以及地圖 AppBar 與詳細資訊卡的顯示。
+/// [執行順序說明]:
+/// 1. 初始化 sqflite_ffi 並設定 PackageInfo 模擬值。
+/// 2. 建立臨時目錄並寫入測試用的 CSV 班表。
+/// 3. 測試 syncDataIfNeeded：驗證首次同步成功匯入，且第二次同步因版本一致而正確跳過。
+/// 4. 測試 UI 組件：啟動 MapScreen 並驗證 AppBar 是否正確顯示快取紀錄數量。
+/// 5. 測試 BottomSheet：點擊垃圾車標記並驗證資訊卡中是否包含可選取的車號文字（SelectableText）。
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -38,6 +46,7 @@ void main() {
   });
 
   group('Versioned Local Import & UI Tests', () {
+    /// 版本化本地匯入與 UI 測試：驗證資料同步的跳過機制以及 AppBar 與 BottomSheet 的顯示資訊
     late Directory tempDir;
     late DatabaseService dbService;
 
@@ -63,6 +72,7 @@ void main() {
     });
 
     test('syncDataIfNeeded should import and skip correctly', () async {
+      /// 測試同步跳過機制：驗證當本地資料已存在且版本一致時，第二次同步應正確跳過以節省效能
       final service = NtpcGarbageService(localSourceDir: tempDir.path);
       await service.syncDataIfNeeded();
       final count = await dbService.getTotalCount();
@@ -74,6 +84,7 @@ void main() {
     });
 
     testWidgets('AppBar display record count', (WidgetTester tester) async {
+      /// 測試 AppBar 顯示：驗證地圖標題列是否正確顯示當前緩存的紀錄數量
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -88,6 +99,7 @@ void main() {
     });
 
     testWidgets('SelectableText in BottomSheet', (WidgetTester tester) async {
+      /// 測試 BottomSheet 內容：驗證點擊垃圾車後出現的詳細資訊卡中，是否使用了可選取的文字元件（SelectableText）
       await tester.pumpWidget(
         ProviderScope(
           overrides: [

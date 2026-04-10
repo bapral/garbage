@@ -1,3 +1,11 @@
+/// [整體程式說明]: 高雄市垃圾車服務深層整合測試，使用 Mock API 驗證完整的資料同步流程、時間查詢以及垃圾車點位抓取邏輯。
+/// [執行順序說明]:
+/// 1. 初始化記憶體資料庫並重置 DatabaseService 實例。
+/// 2. 使用 MockClient 注入模擬的高雄市多筆 API 回傳資料。
+/// 3. 執行 syncDataIfNeeded 同步方法並指定版本號。
+/// 4. 驗證資料庫中是否成功存入指定筆數的資料。
+/// 5. 模擬特定時間（19:30）執行查詢，驗證回傳的點位名稱與屬性是否正確。
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ntpc_garbage_map/models/city_config.dart';
 import 'package:ntpc_garbage_map/services/database_service.dart';
@@ -17,6 +25,7 @@ void main() {
   databaseFactory = databaseFactoryFfi;
 
   group('高雄市垃圾車服務整合測試 (Mock 版)', () {
+    /// 高雄市垃圾車服務整合測試：驗證模擬環境下的資料同步、庫存狀態及時間搜尋功能
     late DatabaseService dbService;
     late KaohsiungGarbageService khService;
 
@@ -66,6 +75,7 @@ void main() {
     });
 
     test('測試高雄市資料同步流程 (Mock API)', () async {
+      /// 測試同步流程：驗證高雄市資料是否能正確存入資料庫，並測試 19:30 的點位查詢準確性
       print('[測試] 開始執行高雄市資料同步 (Mock)...');
       
       await khService.syncDataIfNeeded(debugVersion: '1.0.0+test');
@@ -86,6 +96,7 @@ void main() {
     });
 
     test('測試 KaohsiungGarbageService.findTrucksByTime (Mock)', () async {
+      /// 測試垃圾車查詢：驗證服務層級的 findTrucksByTime 函式是否能正確回傳特定時間的垃圾車物件
       await khService.syncDataIfNeeded(debugVersion: '1.0.0+test');
       
       // 測試 19:30 的垃圾車

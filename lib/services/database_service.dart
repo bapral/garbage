@@ -1,3 +1,16 @@
+/// [整體程式說明]
+/// 本文件定義了 [DatabaseService] 類別，是應用程式唯一的持久化資料存取層。
+/// 基於 SQLite 實作，負責儲存各縣市的靜態垃圾清運站點（班表資料）與系統中繼資料（如版本號）。
+/// 此外，本類別還集成了全域日誌系統，能將執行過程中的錯誤與重要事件寫入本地日誌檔案。
+///
+/// [執行順序說明]
+/// 1. 透過單例模式 `DatabaseService()` 獲取實例。
+/// 2. 首次存取 `db` 屬性時，觸發 `_initDb` 進行 SQLite 引擎初始化（包含 Windows FFI 設定）。
+/// 3. 若資料庫不存在，則執行 `onCreate` 建立資料表與索引。
+/// 4. 服務層透過 `getStoredVersion` 檢查是否需要同步資料。
+/// 5. 執行 `saveRoutePoints` 或 `clearAndSaveRoutePoints` 進行批量資料寫入。
+/// 6. `findPointsByTime` 根據時間演算法從資料庫檢索符合時段的清運點位。
+
 import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -7,14 +20,22 @@ import 'package:latlong2/latlong.dart';
 import 'package:meta/meta.dart';
 import 'package:flutter/foundation.dart';
 
-/// 資料庫服務類別，負責本地 SQLite 資料庫的初始化、維護與查詢。
-/// 採用單例模式 (Singleton) 確保全域只有一個資料庫實體。
+/// [DatabaseService] 類別負責本地 SQLite 資料庫的生命週期管理與資料存取。
+/// 
+/// 支援跨平台（Windows, Android, iOS, Linux），並整合了日誌寫入功能。
 class DatabaseService {
+  // 單例模式實作
   static DatabaseService _instance = DatabaseService._internal();
+  
+  /// 獲取 [DatabaseService] 的單例實例。
   factory DatabaseService() => _instance;
+  
+  /// 內部分建構子。
   DatabaseService._internal();
 
-  /// 提供測試時重置單例的方法，主要用於單元測試環境。
+  /// 專供單元測試使用的重置方法。
+  /// 
+  /// 用於清除目前資料庫連線並重新初始化單例，確保測試環境的純淨。
   @visibleForTesting
   static void resetInstance() {
     _db?.close();
@@ -23,28 +44,37 @@ class DatabaseService {
   }
 
   static Database? _db;
-  static const String tableName = 'route_points'; // 儲存清運點位的資料表
-  static const String metaTable = 'metadata';     // 儲存版本與中繼資料的資料表
+  /// 儲存清運路線點位的資料表名稱。
+  static const String tableName = 'route_points';
+  /// 儲存系統中繼資料（如版本資訊）的資料表名稱。
+  static const String metaTable = 'metadata';
   
-  // 允許自定義資料庫路徑 (預設為檔案路徑)，便於測試使用記憶體資料庫
+  // 自定義路徑，便於測試時切換至記憶體資料庫
   static String? _customPath;
+  
+  /// 設定自定義資料庫儲存路徑（僅供測試使用）。
   @visibleForTesting
   static set customPath(String? path) => _customPath = path;
 
-  /// 記錄日誌訊息。
-  /// [message] 為主要訊息，[error] 與 [stackTrace] 為選用的錯誤資訊。
-  /// 訊息會同時輸出至偵錯主機 (debugPrint) 並非同步寫入本地檔案。
+  /// 全域日誌記錄功能。
+  /// 
+  /// 會同步顯示在控制台，並非同步寫入本地檔案，方便離線偵錯。
+  /// [message] 日誌文字內容。
+  /// [error] 選擇性傳入的錯誤物件。
+  /// [stackTrace] 選擇性傳入的堆疊資訊。
   static Future<void> log(String message, {Object? error, StackTrace? stackTrace}) async {
     final now = DateTime.now();
     final logStr = '[$now] $message${error != null ? '\nError: $error' : ''}${stackTrace != null ? '\nStackTrace: $stackTrace' : ''}\n---\n';
     debugPrint(logStr);
     
-    // 非同步寫入檔案，不阻塞執行流程
+    // 執行檔案寫入 (Fire-and-forget)
     _writeLogToFile(logStr);
   }
 
-  /// 將日誌內容寫入實體檔案。
-  /// 根據作業系統 (Windows/Linux/macOS) 決定不同的日誌存儲路徑。
+  /// 將日誌字串附加至本地日誌檔。
+  /// 
+  /// 根據作業系統環境變數決定儲存位置。
+  /// [logStr] 已格式化的日誌字串。
   static Future<void> _writeLogToFile(String logStr) async {
     try {
       String? logPath;
@@ -59,67 +89,77 @@ class DatabaseService {
       
       if (logPath != null) {
         final file = File(logPath);
+        // 使用 append 模式確保舊日誌不被覆蓋
         await file.writeAsString(logStr, mode: FileMode.append, flush: true);
       }
     } catch (e) {
-      debugPrint('Failed to write log: $e');
+      debugPrint('日誌檔案寫入失敗: $e');
     }
   }
 
-  /// 取得資料庫實體。如果尚未初始化，則會呼叫 [_initDb] 進行初始化。
+  /// 獲取已初始化的資料庫實體。
+  /// 
+  /// 採延遲載入（Lazy loading）模式，若尚未初始化則呼叫 [_initDb]。
   Future<Database> get db async {
     if (_db != null) return _db!;
     _db = await _initDb();
     return _db!;
   }
 
-  /// 初始化資料庫。
-  /// 包含針對桌面平台 (Windows/Linux) 的 FFI 初始化，以及資料表的建立與版本升級。
+  /// 初始化 SQLite 資料庫。
+  /// 
+  /// 針對桌面端 (Windows) 啟動 FFI 支援，並建立資料表與索引。
+  /// 回傳建構完成的 [Database] 實例。
   Future<Database> _initDb() async {
     try {
-      await log('Initializing database...');
+      await log('正在初始化資料庫實體...');
       if (Platform.isWindows || Platform.isLinux) {
         sqfliteFfiInit();
         databaseFactory = databaseFactoryFfi;
-        await log('sqfliteFfi initialized');
+        await log('sqfliteFfi 啟動完成');
       }
       
-      // 如果有設定自定義路徑（如記憶體資料庫），優先使用
+      // 組合資料庫路徑
       final String path = _customPath ?? join(await getDatabasesPath(), 'garbage_map_v3.db');
-      await log('Database path: $path');
+      await log('資料庫儲存路徑: $path');
       
       final db = await openDatabase(
         path,
-        version: 2, // 升級版本以套用 city 欄位 (版本 1 無此欄位)
+        version: 2, // 版本 2 引入了 'city' 欄位
         onCreate: (db, version) async {
-          await log('Creating database tables...');
-          // 建立清運點位表與索引，最佳化查詢效能
+          await log('正在建立全新資料表結構...');
+          // 點位資料表
           await db.execute('CREATE TABLE $tableName (lineId TEXT, lineName TEXT, rank INTEGER, name TEXT, latitude REAL, longitude REAL, arrivalTime TEXT, city TEXT)');
+          // 中繼資料表
           await db.execute('CREATE TABLE $metaTable (key TEXT PRIMARY KEY, value TEXT)');
+          // 建立索引以提升大量資料查詢速度
           await db.execute('CREATE INDEX idx_lineId ON $tableName (lineId)');
           await db.execute('CREATE INDEX idx_time ON $tableName (arrivalTime)');
           await db.execute('CREATE INDEX idx_city ON $tableName (city)');
-          await log('Tables created successfully');
+          await log('資料表建立完成');
         },
         onUpgrade: (db, oldVersion, newVersion) async {
-          await log('Upgrading database from $oldVersion to $newVersion...');
+          await log('偵測到版本更新：從 $oldVersion 升級至 $newVersion');
           if (oldVersion < 2) {
-            // 從版本 1 升級至 2，補上城市區分欄位與索引
+            // 從版本 1 升級上來的處理邏輯
             await db.execute('ALTER TABLE $tableName ADD COLUMN city TEXT');
             await db.execute('CREATE INDEX idx_city ON $tableName (city)');
           }
-          await log('Upgrade complete');
+          await log('資料庫升級完成');
         },
       );
-      await log('Database opened successfully');
+      await log('資料庫連線開啟成功');
       return db;
     } catch (e, stack) {
-      await log('Database initialization failed', error: e, stackTrace: stack);
+      await log('資料庫初始化失敗，可能造成功能異常', error: e, stackTrace: stack);
       rethrow;
     }
   }
 
-  /// 獲取特定城市已儲存的資料版本 (通常為 App 版本)。
+  /// 獲取特定城市當前快取的資料版本標籤。
+  /// 
+  /// [city] 城市代碼。
+  /// 回傳版本字串，若無紀錄則為 null。
   Future<String?> getStoredVersion(String city) async {
     final database = await db;
     final List<Map<String, dynamic>> maps = await database.query(metaTable, where: 'key = ?', whereArgs: ['app_version_$city']);
@@ -127,19 +167,26 @@ class DatabaseService {
   }
 
   /// 更新特定城市的資料版本紀錄。
+  /// 
+  /// [version] 新的版本標籤。
+  /// [city] 城市代碼。
   Future<void> updateVersion(String version, String city) async {
     final database = await db;
     await database.insert(metaTable, {'key': 'app_version_$city', 'value': version}, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  /// 刪除特定城市的所有路線點位資料。
+  /// 刪除特定城市在資料庫中的所有快取點位。
+  /// 
+  /// [city] 城市代碼。
   Future<void> clearAllRoutePoints(String city) async {
     final database = await db;
     await database.delete(tableName, where: 'city = ?', whereArgs: [city]);
   }
 
-  /// 批量存入路線點位資料。
-  /// [points] 為待存入的點位清單，[city] 為城市標籤。
+  /// 批量寫入路線點位（高效能）。
+  /// 
+  /// [points] 點位清單。
+  /// [city] 城市代碼。
   Future<void> saveRoutePoints(List<GarbageRoutePoint> points, String city) async {
     final database = await db;
     await database.transaction((txn) async {
@@ -155,8 +202,11 @@ class DatabaseService {
     });
   }
 
-  /// 原子操作：清空該城市的舊點位並存入新點位。
-  /// 使用資料庫事務 (Transaction) 確保操作的完整性，防止同步期間出現資料不一致。
+  /// 原子操作：同步資料時先刪除舊資料再插入新資料。
+  /// 
+  /// 使用事務（Transaction）確保資料的一致性與操作原子性。
+  /// [points] 點位清單。
+  /// [city] 城市代碼。
   Future<void> clearAndSaveRoutePoints(List<GarbageRoutePoint> points, String city) async {
     final database = await db;
     await database.transaction((txn) async {
@@ -173,7 +223,10 @@ class DatabaseService {
     });
   }
 
-  /// 取得總點位數。可依 [city] 過濾。
+  /// 查詢總點位數量。
+  /// 
+  /// [city] 選擇性傳入城市代碼，若無則查詢全體。
+  /// 回傳整數總計筆數。
   Future<int> getTotalCount([String? city]) async {
     final database = await db;
     if (city != null) {
@@ -182,18 +235,24 @@ class DatabaseService {
     return Sqflite.firstIntValue(await database.rawQuery('SELECT COUNT(*) FROM $tableName')) ?? 0;
   }
 
-  /// 檢查特定城市是否已有快取資料。
+  /// 判斷特定城市是否有快取資料。
+  /// 
+  /// [city] 城市代碼。
+  /// 回傳布林值。
   Future<bool> hasData(String city) async => (await getTotalCount(city)) > 0;
 
-  /// 根據指定時間點查詢附近 20 分鐘內的點位。
-  /// [hour], [minute] 為指定時間，[city] 為城市。
-  /// 邏輯：抓取指定時間前 3 分鐘到後 17 分鐘內的資料。
+  /// 核心查詢邏輯：找出指定時間區間內的清運點位。
+  /// 
+  /// [hour], [minute] 為使用者指定的基準點。
+  /// [city] 城市代碼。
+  /// 查詢邏輯：查詢基準點前 3 分鐘至後 17 分鐘內的所有站點。
+  /// 回傳符合條件的 [GarbageRoutePoint] 清單。
   Future<List<GarbageRoutePoint>> findPointsByTime(int hour, int minute, String city) async {
     final database = await db;
     final String start = _offsetTime(hour, minute, -3);
     final String end = _offsetTime(hour, minute, 17);
     
-    await log('正在查詢點位: city=$city, range=$start~$end');
+    await log('執行班表查詢: city=$city, 時段範圍 $start ~ $end');
     
     final List<Map<String, dynamic>> maps = await database.query(
       tableName, 
@@ -206,15 +265,22 @@ class DatabaseService {
     )).toList();
   }
 
-  /// 計算時間偏移量並回傳 HH:mm 格式字串。
+  /// 計算時間偏移量並標準化為 HH:mm 格式。
+  /// 
+  /// [h] 小時，[m] 分鐘，[offset] 偏移分鐘。
+  /// 回傳格式化字串。
   String _offsetTime(int h, int m, int offset) {
     int total = h * 60 + m + offset;
+    // 邊界檢查
     if (total < 0) total = 0; if (total > 1439) total = 1439;
     return '${(total ~/ 60).toString().padLeft(2, '0')}:${(total % 60).toString().padLeft(2, '0')}';
   }
 
-  /// 根據路線 ID (lineId) 取得該城市特定路線的所有點位。
-  /// 結果依序 (rank ASC) 排列。
+  /// 根據路線編號 (lineId) 獲取完整行駛路徑站點。
+  /// 
+  /// [lineId] 路線 ID。
+  /// [city] 城市代碼。
+  /// 回傳依 [rank] 排序的 [GarbageRoutePoint] 清單。
   Future<List<GarbageRoutePoint>> getRoutePoints(String lineId, String city) async {
     final database = await db;
     final List<Map<String, dynamic>> maps = await database.query(
