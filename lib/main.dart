@@ -32,7 +32,9 @@ void main() {
     WidgetsFlutterBinding.ensureInitialized();
     
     // 記錄啟動日誌，方便追蹤應用程式生命週期。
-    DatabaseService.log('Application starting...');
+    DatabaseService.log('=== Application Starting ===');
+    DatabaseService.log('Operating System: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}');
+    DatabaseService.log('Dart VM version: ${Platform.version}');
     
     // 捕捉並處理來自 Flutter 框架層級的錯誤（例如 Widget 建構失敗）。
     FlutterError.onError = (FlutterErrorDetails details) {

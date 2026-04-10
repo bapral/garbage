@@ -41,7 +41,15 @@ class KaohsiungGarbageService extends BaseGarbageService {
   /// [localSourceDir] 本地資源目錄。
   /// [client] 可選傳入 http.Client 以利測試。
   KaohsiungGarbageService({required super.localSourceDir, http.Client? client}) 
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client() {
+    DatabaseService.log('KaohsiungGarbageService 已建立');
+  }
+
+  @override
+  void dispose() {
+    _client.close();
+    DatabaseService.log('KaohsiungGarbageService 已釋放資源 (Client closed)');
+  }
 
   /// 檢查高雄市資料版本並執行同步。
   /// 

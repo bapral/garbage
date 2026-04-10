@@ -44,17 +44,27 @@ class CitySelectionNotifier extends Notifier<String> {
 /// 負責根據當前城市配置，動態實例化對應的 Service 類別。
 final garbageServiceProvider = Provider<BaseGarbageService>((ref) {
   final config = ref.watch(currentCityConfigProvider);
+  BaseGarbageService service;
+  
   if (config.cityName == 'taipei') {
-    return TaipeiGarbageService(localSourceDir: config.localSourceDir);
+    service = TaipeiGarbageService(localSourceDir: config.localSourceDir);
   } else if (config.cityName == 'taichung') {
-    return TaichungGarbageService(localSourceDir: config.localSourceDir);
+    service = TaichungGarbageService(localSourceDir: config.localSourceDir);
   } else if (config.cityName == 'tainan') {
-    return TainanGarbageService(localSourceDir: config.localSourceDir);
+    service = TainanGarbageService(localSourceDir: config.localSourceDir);
   } else if (config.cityName == 'kaohsiung') {
-    return KaohsiungGarbageService(localSourceDir: config.localSourceDir);
+    service = KaohsiungGarbageService(localSourceDir: config.localSourceDir);
+  } else {
+    service = NtpcGarbageService(localSourceDir: config.localSourceDir);
   }
-  // 預設回傳新北市服務
-  return NtpcGarbageService(localSourceDir: config.localSourceDir);
+
+  // 確保在 Provider 銷毀時釋放 Service 資源 (如 http.Client)
+  ref.onDispose(() {
+    DatabaseService.log('garbageServiceProvider (${config.cityName}) 正在銷毀，執行 dispose...');
+    service.dispose();
+  });
+
+  return service;
 });
 
 /// 顯示來源狀態資訊，用於在 AppBar 顯示資料抓取來源（如：雲端 API 或 資料庫預測）。

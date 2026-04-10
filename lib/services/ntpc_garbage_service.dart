@@ -47,6 +47,9 @@ abstract class BaseGarbageService {
   /// 抽象方法：獲取特定路線編號的完整點位序列。
   /// [lineId] 路線編號。
   Future<List<GarbageRoutePoint>> getRouteForLine(String lineId);
+
+  /// 釋放資源（如關閉 HTTP 用戶端）。
+  void dispose();
 }
 
 /// [NtpcGarbageService] 負責新北市垃圾清運資料的處理。
@@ -71,7 +74,15 @@ class NtpcGarbageService extends BaseGarbageService {
   /// 建構子：初始化新北市服務。
   /// [localSourceDir] 資源路徑，[client] 可選傳入 http.Client。
   NtpcGarbageService({required super.localSourceDir, http.Client? client}) 
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client() {
+    DatabaseService.log('NtpcGarbageService 已建立');
+  }
+
+  @override
+  void dispose() {
+    _client.close();
+    DatabaseService.log('NtpcGarbageService 已釋放資源 (Client closed)');
+  }
 
   /// 新北市資料同步邏輯。
   /// 

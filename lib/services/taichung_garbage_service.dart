@@ -37,7 +37,15 @@ class TaichungGarbageService extends BaseGarbageService {
   /// 建構子：初始化台中市服務。
   /// [localSourceDir] 資源目錄，[client] 可選 http 客戶端。
   TaichungGarbageService({required super.localSourceDir, http.Client? client}) 
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client() {
+    DatabaseService.log('TaichungGarbageService 已建立');
+  }
+
+  @override
+  void dispose() {
+    _client.close();
+    DatabaseService.log('TaichungGarbageService 已釋放資源 (Client closed)');
+  }
 
   /// 同步台中市路線點位。
   /// 

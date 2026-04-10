@@ -34,7 +34,15 @@ class TaipeiGarbageService extends BaseGarbageService {
   /// 建構子：初始化台北市服務。
   /// [localSourceDir] 資源路徑，[client] 可選傳入 http.Client。
   TaipeiGarbageService({required super.localSourceDir, http.Client? client}) 
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client() {
+    DatabaseService.log('TaipeiGarbageService 已建立');
+  }
+
+  @override
+  void dispose() {
+    _client.close();
+    DatabaseService.log('TaipeiGarbageService 已釋放資源 (Client closed)');
+  }
 
   /// 台北市路線資料同步。
   /// 

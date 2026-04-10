@@ -34,7 +34,15 @@ class TainanGarbageService extends BaseGarbageService {
   /// 建構子：初始化台南市服務。
   /// [localSourceDir] 資源目錄，[client] 可選傳入 http 客戶端。
   TainanGarbageService({required super.localSourceDir, http.Client? client}) 
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client() {
+    DatabaseService.log('TainanGarbageService 已建立');
+  }
+
+  @override
+  void dispose() {
+    _client.close();
+    DatabaseService.log('TainanGarbageService 已釋放資源 (Client closed)');
+  }
 
   /// 台南市路線點位同步程序。
   /// 

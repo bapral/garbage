@@ -56,9 +56,12 @@ class DatabaseService {
   @visibleForTesting
   static set customPath(String? path) => _customPath = path;
 
+  // 用於確保日誌順序寫入的 Future 鏈接，避免 Windows 檔案鎖定衝突
+  static Future<void> _logQueue = Future.value();
+
   /// 全域日誌記錄功能。
   /// 
-  /// 會同步顯示在控制台，並非同步寫入本地檔案，方便離線偵錯。
+  /// 會同步顯示在控制台，並非同步順序寫入本地檔案，方便離線偵錯。
   /// [message] 日誌文字內容。
   /// [error] 選擇性傳入的錯誤物件。
   /// [stackTrace] 選擇性傳入的堆疊資訊。
@@ -67,8 +70,10 @@ class DatabaseService {
     final logStr = '[$now] $message${error != null ? '\nError: $error' : ''}${stackTrace != null ? '\nStackTrace: $stackTrace' : ''}\n---\n';
     debugPrint(logStr);
     
-    // 執行檔案寫入 (Fire-and-forget)
-    _writeLogToFile(logStr);
+    // 將寫入任務排入隊列，確保順序執行
+    _logQueue = _logQueue.then((_) => _writeLogToFile(logStr)).catchError((e) {
+      debugPrint('日誌隊列執行異常: $e');
+    });
   }
 
   /// 將日誌字串附加至本地日誌檔。
@@ -89,11 +94,12 @@ class DatabaseService {
       
       if (logPath != null) {
         final file = File(logPath);
-        // 使用 append 模式確保舊日誌不被覆蓋
+        // 使用 append 模式確保舊日誌不被覆蓋，flush 確保即時寫入磁碟
         await file.writeAsString(logStr, mode: FileMode.append, flush: true);
       }
     } catch (e) {
-      debugPrint('日誌檔案寫入失敗: $e');
+      // 這裡不使用 log() 以免造成無窮遞迴
+      debugPrint('日誌檔案寫入失敗 (File: $logStr): $e');
     }
   }
 

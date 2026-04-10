@@ -18,6 +18,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 import '../providers/garbage_provider.dart';
 import '../models/garbage_truck.dart';
+import '../services/database_service.dart';
 
 /// 地圖主畫面類別，負責地圖渲染、圖層顯示與使用者互動。
 /// 
@@ -52,6 +53,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   @override
   void initState() {
     super.initState();
+    DatabaseService.log('MapScreen 進入 initState');
     // 初始化時嘗試獲取 GPS 權限與當前位置
     _determinePosition(); 
   }
@@ -60,19 +62,27 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// 
   /// 此方法會依序檢查定位服務是否啟用、權限是否獲得，最後更新 [_userPosition] 並移動地圖。
   Future<void> _determinePosition() async {
+    DatabaseService.log('正在獲取 GPS 定位...');
     // 檢查定位服務是否開啟
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
+    if (!serviceEnabled) {
+      DatabaseService.log('GPS 定位服務未啟用');
+      return;
+    }
 
     // 檢查並要求定位權限
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return;
+      if (permission == LocationPermission.denied) {
+        DatabaseService.log('GPS 定位權限被拒絕');
+        return;
+      }
     }
 
     // 獲取當前經緯度
     final pos = await Geolocator.getCurrentPosition();
+    DatabaseService.log('GPS 定位獲取成功: ${pos.latitude}, ${pos.longitude}');
     if (mounted) {
       setState(() {
         _userPosition = pos;
@@ -116,6 +126,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// 並在地圖上劃出一條輔助線，同時自動縮放視野以顯示兩端。
   /// [trucks] 為目前地圖上所有可見的垃圾車清單。
   void _findNearestTruck(List<GarbageTruck> trucks) {
+    DatabaseService.log('執行「搜尋最近垃圾車」功能，候選車輛筆數: ${trucks.length}');
     final userLatLng = _getEffectiveUserLatLng();
     if (userLatLng == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('請先獲取位置或在地圖上手動指定地點')));
@@ -141,6 +152,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     }
 
     if (nearestTruck != null) {
+      DatabaseService.log('找到最近車輛: ${nearestTruck.carNumber}, 距離: ${minDistance.toInt()} 公尺');
       setState(() {
         _selectedPolyline = null; // 清除點選線條
         _nearestPolyline = Polyline(
@@ -229,6 +241,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             // 點擊 AppBar 標題可快速切換定位模式
             ref.read(locationModeProvider.notifier).toggle();
             final newMode = ref.read(locationModeProvider);
+            DatabaseService.log('切換定位模式: $newMode');
             _clearAllPolylines();
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text(newMode == LocationMode.auto ? '已切換為：自動 GPS 定位' : '已切換為：手動指定地點 (請點擊地圖)'),
@@ -278,10 +291,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             icon: Icon(isNow ? Icons.refresh : Icons.auto_graph),
             onPressed: isNow 
               ? () {
+                  DatabaseService.log('手動點擊「重新整理」即時車輛');
                   _clearAllPolylines();
                   ref.read(garbageTrucksProvider.notifier).refresh();
                 }
               : () {
+                  DatabaseService.log('手動點擊「重置回即時」模式');
                   ref.read(predictionDurationProvider.notifier).reset();
                   ref.read(targetTimeProvider.notifier).reset();
                   _clearAllPolylines();
@@ -299,6 +314,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             iconColor: appBarTitleColor,
             onSelected: (value) {
               if (value == 'update') {
+                DatabaseService.log('觸發「強制清除並更新資料庫」');
                 ref.read(garbageTrucksProvider.notifier).forceUpdateRouteData();
               }
             },
@@ -346,6 +362,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 initialZoom: 14.0,
                 onTap: (_, point) {
                   if (ref.read(locationModeProvider) == LocationMode.manual) {
+                    DatabaseService.log('手動指定位置: ${point.latitude}, ${point.longitude}');
                     ref.read(manualPositionProvider.notifier).setPosition(point);
                     _clearAllPolylines();
                   } else {
@@ -398,7 +415,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       width: 65,
                       height: 65,
                       child: GestureDetector(
-                        onTap: () => _showTruckInfo(truck),
+                        onTap: () {
+                          DatabaseService.log('選取車輛標記: ${truck.carNumber}');
+                          _showTruckInfo(truck);
+                        },
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
@@ -484,6 +504,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                       if (!isNow)
                         TextButton(
                           onPressed: () {
+                            DatabaseService.log('卡片內點選「回到現在」');
                             ref.read(predictionDurationProvider.notifier).reset();
                             ref.read(targetTimeProvider.notifier).reset();
                             _clearAllPolylines();
@@ -547,10 +568,14 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             heroTag: 'location',
             onPressed: () {
               if (ref.read(locationModeProvider) == LocationMode.auto) {
+                DatabaseService.log('FAB: 移動地圖至當前 GPS 位置');
                 _determinePosition();
               } else {
                 final mPos = ref.read(manualPositionProvider);
-                if (mPos != null) _mapController.move(mPos, 15);
+                if (mPos != null) {
+                  DatabaseService.log('FAB: 移動地圖至手動指定位置');
+                  _mapController.move(mPos, 15);
+                }
               }
             },
             backgroundColor: config.themeColor[700],
@@ -600,6 +625,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       leading: Icon(Icons.map, color: color),
       title: Text(label),
       onTap: () {
+        DatabaseService.log('選取縣市: $cityKey ($label)');
         ref.read(citySelectionProvider.notifier).setCity(cityKey);
         Navigator.pop(context);
         _onCityChanged();
@@ -613,6 +639,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   void _onCityChanged() {
     _clearAllPolylines();
     final config = ref.read(currentCityConfigProvider);
+    DatabaseService.log('縣市已變更，移動地圖中心至: ${config.initialCenter}');
     _mapController.move(config.initialCenter, 14.0);
   }
 
@@ -620,6 +647,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   /// 
   /// 彈出對話框讓使用者選擇「相對時間預測」、「絕對時間查詢」或「重置回即時」。
   void _showPredictionDialog() {
+    DatabaseService.log('顯示預測模式選擇對話框');
     showDialog(
       context: context,
       builder: (context) {
@@ -646,6 +674,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                   if (time != null) {
                     final now = DateTime.now();
                     final selected = DateTime(now.year, now.month, now.day, time.hour, time.minute);
+                    DatabaseService.log('設定絕對預測時間: ${selected.hour}:${selected.minute}');
                     ref.read(targetTimeProvider.notifier).setTime(selected);
                     ref.read(predictionDurationProvider.notifier).reset();
                     _clearAllPolylines();
@@ -657,6 +686,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 leading: const Icon(Icons.sensors, color: Colors.green),
                 title: const Text('重置模式：回到即時動態'),
                 onTap: () {
+                  DatabaseService.log('重置預測模式為「即時」');
                   Navigator.pop(context);
                   ref.read(predictionDurationProvider.notifier).reset();
                   ref.read(targetTimeProvider.notifier).reset();
@@ -702,6 +732,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
                 ElevatedButton(
                   onPressed: () {
+                    DatabaseService.log('設定相對預測時長: $hours 小時 $minutes 分鐘');
                     ref.read(predictionDurationProvider.notifier).setDuration(Duration(hours: hours, minutes: minutes));
                     ref.read(targetTimeProvider.notifier).reset();
                     _clearAllPolylines();
