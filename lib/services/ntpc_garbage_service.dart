@@ -21,6 +21,7 @@ import 'database_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:csv/csv.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 
 /// [BaseGarbageService] 是所有城市垃圾清運服務的基底抽象類別。
 /// 
@@ -50,6 +51,51 @@ abstract class BaseGarbageService {
 
   /// 釋放資源（如關閉 HTTP 用戶端）。
   void dispose();
+}
+
+/// 內部使用的解析封裝物件，用於 Isolate 溝通。
+class _CsvParseInput {
+  final String csvBody;
+  const _CsvParseInput(this.csvBody);
+}
+
+/// 在獨立 Isolate 中執行的 CSV 解析函式。
+List<GarbageRoutePoint> _parseCsvIsolate(_CsvParseInput input) {
+  final List<List<dynamic>> fields = const CsvToListConverter(
+    shouldParseNumbers: false, 
+    eol: '\n'
+  ).convert(input.csvBody);
+
+  if (fields.length <= 1) return [];
+
+  // 解析 CSV 標頭欄位索引
+  final header = fields[0].map((e) => e.toString().toLowerCase().trim()).toList();
+  int idxLineId = header.indexOf('lineid');
+  int idxLat = header.indexOf('latitude');
+  int idxLng = header.indexOf('longitude');
+  int idxTime = header.indexOf('time');
+  int idxLineName = header.indexOf('linename');
+  int idxName = header.indexOf('name');
+  int idxRank = header.indexOf('rank');
+
+  List<GarbageRoutePoint> result = [];
+  for (int i = 1; i < fields.length; i++) {
+    final row = fields[i];
+    if (row.length < 4) continue;
+
+    result.add(GarbageRoutePoint(
+      lineId: row[idxLineId].toString(),
+      lineName: idxLineName != -1 ? row[idxLineName].toString() : '',
+      rank: idxRank != -1 ? (int.tryParse(row[idxRank].toString()) ?? 0) : i,
+      name: idxName != -1 ? row[idxName].toString() : '',
+      position: LatLng(
+        double.tryParse(row[idxLat].toString()) ?? 0, 
+        double.tryParse(row[idxLng].toString()) ?? 0
+      ),
+      arrivalTime: row[idxTime].toString(),
+    ));
+  }
+  return result;
 }
 
 /// [NtpcGarbageService] 負責新北市垃圾清運資料的處理。
@@ -125,55 +171,25 @@ class NtpcGarbageService extends BaseGarbageService {
   /// 回傳是否成功。
   Future<bool> _syncFromApi(void Function(String)? onProgress) async {
     try {
-      // 請求較大筆數以涵蓋所有路線
       final response = await _client.get(Uri.parse('$routeUrl?size=100000'), headers: _headers);
       
       if (response.statusCode == 200) {
-        final String body = response.body.trim();
-        final List<List<dynamic>> fields = const CsvToListConverter(
-          shouldParseNumbers: false, 
-          eol: '\n'
-        ).convert(body);
+        onProgress?.call('獲取原始 CSV 資料，正在啟動背景解析 (Isolate)...');
+        
+        // 使用 compute 函式 在獨立 Isolate 中執行耗時的 CSV 解析，避免 UI 凍結
+        final List<GarbageRoutePoint> allPoints = await compute(_parseCsvIsolate, _CsvParseInput(response.body.trim()));
 
-        // 檢查獲取筆數是否合理
-        if (fields.length > 5000) {
-          onProgress?.call('獲取 ${fields.length - 1} 筆點位，正在清理舊資料並寫入...');
+        if (allPoints.length > 5000) {
+          onProgress?.call('解析完成，共有 ${allPoints.length} 筆點位，正在清理舊資料並寫入...');
           await _dbService.clearAllRoutePoints('ntpc');
           
-          // 解析 CSV 標頭欄位索引
-          final header = fields[0].map((e) => e.toString().toLowerCase().trim()).toList();
-          int idxLineId = header.indexOf('lineid');
-          int idxLat = header.indexOf('latitude');
-          int idxLng = header.indexOf('longitude');
-          int idxTime = header.indexOf('time');
-          int idxLineName = header.indexOf('linename');
-          int idxName = header.indexOf('name');
-          int idxRank = header.indexOf('rank');
-
-          List<GarbageRoutePoint> batch = [];
-          for (int i = 1; i < fields.length; i++) {
-            final row = fields[i];
-            if (row.length < 4) continue;
-
-            batch.add(GarbageRoutePoint(
-              lineId: row[idxLineId].toString(),
-              lineName: idxLineName != -1 ? row[idxLineName].toString() : '',
-              rank: idxRank != -1 ? (int.tryParse(row[idxRank].toString()) ?? 0) : i,
-              name: idxName != -1 ? row[idxName].toString() : '',
-              position: LatLng(
-                double.tryParse(row[idxLat].toString()) ?? 0, 
-                double.tryParse(row[idxLng].toString()) ?? 0
-              ),
-              arrivalTime: row[idxTime].toString(),
-            ));
-
-            // 每 1000 筆批次存入，兼顧效能與記憶體
-            if (batch.length >= 1000) {
-              await _dbService.saveRoutePoints(batch, 'ntpc');
-              batch.clear();
-            }
+          // 增加批次寫入的大小 (從 1000 提升到 5000) 以減少與 SQLite 的互動頻率
+          const int batchSize = 5000;
+          for (int i = 0; i < allPoints.length; i += batchSize) {
+            int end = (i + batchSize < allPoints.length) ? i + batchSize : allPoints.length;
+            await _dbService.saveRoutePoints(allPoints.sublist(i, end), 'ntpc');
+            onProgress?.call('資料庫寫入進度: $end / ${allPoints.length}...');
           }
-          if (batch.isNotEmpty) await _dbService.saveRoutePoints(batch, 'ntpc');
           return true;
         }
       }

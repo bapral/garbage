@@ -385,8 +385,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 ),
                 // 垃圾車標記圖層
                 MarkerLayer(
-                  markers: trucks.map((truck) {
-                    // 根據車輛來源定義標記顏色與簡稱
+                  markers: trucks.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final truck = entry.value;
+                    // 使用 索引 + 車號 + 座標 的組合鍵，確保全域唯一性，避免 Duplicate Key 錯誤
+                    final key = ValueKey('truck_${truck.carNumber}_${truck.position.latitude}_${truck.position.longitude}_$index');
+                    
                     Color cityColor;
                     String cityShort;
                     
@@ -411,9 +415,10 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                     }
                     
                     return Marker(
+                      key: key,
                       point: truck.position,
-                      width: 65,
-                      height: 65,
+                      width: 50,
+                      height: 50,
                       child: GestureDetector(
                         onTap: () {
                           DatabaseService.log('選取車輛標記: ${truck.carNumber}');
@@ -422,34 +427,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                         child: Stack(
                           alignment: Alignment.center,
                           children: [
+                            // 簡化後的標記背景，減少陰影計算以提升 FPS
                             Container(
-                              width: 45,
-                              height: 45,
+                              width: 38,
+                              height: 38,
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: cityColor, width: 2),
-                                boxShadow: [
-                                  BoxShadow(color: cityColor.withValues(alpha: 0.5), blurRadius: 8, spreadRadius: 2),
-                                  const BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 2)),
-                                ],
                               ),
                             ),
-                            Opacity(
-                              opacity: isNow ? 1.0 : 0.7,
-                              child: Icon(Icons.local_shipping_rounded, color: cityColor, size: 28),
-                            ),
+                            Icon(Icons.local_shipping_rounded, color: cityColor, size: 22),
                             Positioned(
-                              top: 5,
-                              right: 5,
+                              top: 0,
+                              right: 0,
                               child: Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(
                                   color: cityColor,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  border: Border.all(color: Colors.white, width: 1),
                                 ),
-                                child: Text(cityShort, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                                child: Text(cityShort, style: const TextStyle(color: Colors.white, fontSize: 7, fontWeight: FontWeight.bold)),
                               ),
                             ),
                           ],
