@@ -263,9 +263,11 @@ class NtpcGarbageService extends BaseGarbageService {
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      // 指南建議加上 size=20000 獲取更多紀錄
       final String requestUrl = '$apiUrl?size=20000&_t=$timestamp';
       
-      final response = await _client.get(Uri.parse(requestUrl), headers: _headers);
+      // 必須設定 User-Agent 與 Referer 以避免 403 Forbidden
+      final response = await _client.get(Uri.parse(requestUrl), headers: _headers).timeout(const Duration(seconds: 15));
       if (response.statusCode == 200) {
         final String body = response.body.trim();
         final List<List<dynamic>> rows = const CsvToListConverter(shouldParseNumbers: false, eol: '\n').convert(body);

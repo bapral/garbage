@@ -1,67 +1,57 @@
 # =============================================================================
-# [專案配置檔說明]
-# 本文件 (pubspec.yaml) 為 Flutter 專案的核心配置檔案。
-# 負責定義專案中繼資料、環境限制、外部套件依賴 (Dependencies) 以及資產資源 (Assets)。
-#
-# [各區段功能簡述]
-# 1. 專案基本資訊：包含專案名稱、描述、版本號以及發佈設定。
-# 2. 執行環境 (Environment)：指定 Dart SDK 的版本範圍，確保開發與執行環境一致。
-# 3. 核心依賴 (Dependencies)：應用程式運行所必須的套件，如地圖 (flutter_map)、狀態管理 (riverpod) 等。
-# 4. 開發依賴 (Dev Dependencies)：僅在開發與測試階段需要的工具，不包含在最終發佈的應用程式中。
-# 5. Flutter 資源配置：定義 Material Design 支援、字體、圖片資產等。
+# 【檔案說明：pubspec.yaml】
+# 目的 (Purpose)：定義 Flutter 專案的核心元數據、資源路徑與外部依賴關係。
+# 作用 (Role)：作為專案管理的核心，控制編譯環境、套件版本以及 App 的基本識別資訊。
+# 格式與用法 (Format/Usage)：採用 YAML 格式，嚴格遵守縮排。主要區塊包含專案資訊、環境、依賴項與資源定義。
 # =============================================================================
 
-name: ntpc_garbage_map # 專案名稱：新北市垃圾車地圖（擴展至全台）
-description: "A new Flutter project." # 專案描述：一個新的 Flutter 專案
-# 以下行防止套件被意外發佈到 pub.dev。這對於私有套件是首選。
-publish_to: 'none' # 如果您希望發佈到 pub.dev，請刪除此行
+# [專案基本資訊]
+# 目的：設定 App 的唯一識別名稱與描述。
+# 用法：name 需為小寫加底線；version 格式為「版號+內部版本號」。
+name: ntpc_garbage_map
+description: "台灣五都垃圾車即時位置與清運班表整合地圖專案。"
 
-# 以下定義了應用程式的版本和內部版本號。
-# 版本號是由點分隔的三個數字，例如 1.2.43
-# 後面跟著一個可選的內部版本號，由 + 分隔。
+# 防止意外發佈至 pub.dev 平台。
+publish_to: 'none'
+
+# 專案版本號：[語意化版本]+[內部建置序號]
 version: 1.0.0+6
 
+# [環境設定]
+# 目的：限制執行本專案所需的 Dart SDK 最低版本。
+# 格式：使用 ^ 符號表示相容於該主要版本。
 environment:
-  sdk: ^3.11.4 # 指定 Dart SDK 的版本範圍
+  sdk: ^3.11.4
 
-# [依賴項區段] 
-# 指定專案運作所需的外部套件。
+# [依賴項區段 (Dependencies)]
+# 目的：定義應用程式運行時必須包含的外部函式庫與 SDK。
+# 作用：自動下載並連結指定的第三方套件，如地圖、網路請求與資料庫。
 dependencies:
   flutter:
-    sdk: flutter # Flutter 核心 SDK
+    sdk: flutter
 
-  cupertino_icons: ^1.0.8 # 用於 iOS 風格圖示
-  
-  flutter_riverpod: ^3.3.1 # 狀態管理框架
-  
-  flutter_map: ^8.2.2 # 互動式地圖元件
-  
-  latlong2: ^0.9.1 # 地理座標計算工具
-  
-  http: ^1.6.0 # 網路請求套件
-  
-  geolocator: ^14.0.2 # 獲取 GPS 位置
-  
-  intl: ^0.20.2 # 國際化與格式化工具
-  
-  sqflite: ^2.4.1 # 本地 SQLite 資料庫 (行動端)
-  
-  sqflite_common_ffi: ^2.3.3 # 桌面平台 SQLite 支援
-  
-  path: ^1.9.0 # 檔案路徑處理
-  
-  package_info_plus: ^8.2.1 # 獲取 App 版本資訊
-  
-  csv: ^6.0.0 # 解析 CSV 資料格式
+  # 各式功能組件
+  cupertino_icons: ^1.0.8    # iOS 風格圖示
+  flutter_riverpod: ^3.3.1   # 狀態管理框架
+  flutter_map: ^8.2.2        # 互動式地圖元件
+  latlong2: ^0.9.1           # 地理座標計算工具
+  http: ^1.6.0               # REST API 網路請求
+  geolocator: ^14.0.2        # 獲取 GPS 位置資訊
+  intl: ^0.20.2              # 國際化與時間格式化
+  sqflite: ^2.4.1            # 本地 SQLite 資料庫 (Android/iOS)
+  sqflite_common_ffi: ^2.3.3  # 桌面平台 (Windows/Linux) 資料庫支援
+  path: ^1.9.0               # 跨平台檔案路徑處理
+  package_info_plus: ^8.2.1  # 獲取 App 安裝包資訊
+  csv: ^6.0.0                # 解析新北市等政府提供的 CSV 格式資料
 
-# [開發用依賴項]
-# 僅用於開發、自動化測試或靜態分析。
+# [開發依賴項 (Dev Dependencies)]
+# 目的：定義僅在開發、測試或靜態檢查時需要的工具，不會被包裝進最終的 App 中。
 dev_dependencies:
   flutter_test:
-    sdk: flutter # 官方測試框架
+    sdk: flutter
+  flutter_lints: ^6.0.0      # 程式碼品質與風格檢查工具
 
-  flutter_lints: ^6.0.0 # 程式碼風格檢查建議
-
-# [Flutter 特定設定]
+# [Flutter 特定資源設定]
+# 目的：宣告 App 需要使用的圖片、字體與 Material 設計屬性。
 flutter:
-  uses-material-design: true # 啟用 Material Design 視覺語言
+  uses-material-design: true  # 啟用 Material Design 視覺設計規範

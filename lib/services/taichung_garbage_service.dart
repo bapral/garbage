@@ -154,7 +154,7 @@ class TaichungGarbageService extends BaseGarbageService {
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      final response = await _client.get(Uri.parse('$dynamicApiUrl&limit=20000&_t=$timestamp'));
+      final response = await _client.get(Uri.parse('$dynamicApiUrl&limit=20000&_t=$timestamp')).timeout(const Duration(seconds: 15));
       
       if (response.statusCode == 200) {
         final List<dynamic> results = json.decode(response.body);
@@ -163,24 +163,43 @@ class TaichungGarbageService extends BaseGarbageService {
         return results.map((item) {
           final String carNo = item['car']?.toString() ?? '未知車號';
           final String location = item['location']?.toString() ?? '移動中';
-          final String latStr = item['Y']?.toString() ?? '0';
-          final String lonStr = item['X']?.toString() ?? '0';
+          
+          // 台中市座標：X 為經度, Y 為緯度
+          final double lat = double.tryParse(item['Y']?.toString() ?? '0') ?? 0;
+          final double lon = double.tryParse(item['X']?.toString() ?? '0') ?? 0;
           
           DateTime updateTime = now;
           final String? timeStr = item['time']?.toString();
+          
           if (timeStr != null && timeStr.contains('T')) {
-            // 解析台中 API 特有的 T 格式時間
+            // 解析台中 ISO T 格式 (例如 20240411T093000 -> 09:30)
             try {
-              final String formatted = '${timeStr.substring(0, 4)}-${timeStr.substring(4, 6)}-${timeStr.substring(6, 8)} ${timeStr.substring(9, 11)}:${timeStr.substring(11, 13)}:${timeStr.substring(13, 15)}';
-              updateTime = DateTime.tryParse(formatted) ?? now;
-            } catch (_) {}
+              final parts = timeStr.split('T');
+              if (parts.length >= 2) {
+                final tPart = parts[1];
+                if (tPart.length >= 4) {
+                  final String hh = tPart.substring(0, 2);
+                  final String mm = tPart.substring(2, 4);
+                  final String ss = tPart.length >= 6 ? tPart.substring(4, 6) : '00';
+                  
+                  // 嘗試組合為可解析的 DateTime
+                  final datePart = parts[0]; // yyyyMMdd
+                  if (datePart.length == 8) {
+                    final String isoStr = '${datePart.substring(0, 4)}-${datePart.substring(4, 6)}-${datePart.substring(6, 8)} $hh:$mm:$ss';
+                    updateTime = DateTime.tryParse(isoStr) ?? now;
+                  }
+                }
+              }
+            } catch (e) {
+              DatabaseService.log('台中時間解析失敗: $timeStr', error: e);
+            }
           }
 
           return GarbageTruck(
             carNumber: carNo,
-            lineId: item['lineid']?.toString() ?? '',
+            lineId: item['lineid']?.toString() ?? carNo,
             location: location,
-            position: LatLng(double.tryParse(latStr) ?? 0, double.tryParse(lonStr) ?? 0),
+            position: LatLng(lat, lon),
             updateTime: updateTime,
           );
         }).toList();

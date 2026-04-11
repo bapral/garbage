@@ -1,22 +1,28 @@
 # =============================================================================
-# [靜態分析配置檔說明]
-# 本文件 (analysis_options.yaml) 用於設定 Dart 分析器的行為。
-# 透過定義 Lint 規則，確保團隊開發中的程式碼品質、一致性與安全性。
-# 良好的規則設定能幫助開發者在編譯前就發現潛在的 Bug 或不佳的寫法。
-#
-# [各區區段功能簡述]
-# 1. include：引用外部定義好的規則集（如 Google 或 Flutter 推薦的規範）。
-# 2. analyzer：設定分析器的特定行為（如排除特定檔案或修改錯誤層級）。
-# 3. linter/rules：自定義專案要啟用或禁用的具體程式碼風格規則。
+# 【檔案說明：analysis_options.yaml】
+# 目的 (Purpose)：設定 Dart 分析器 (Analyzer) 的行為與靜態檢查規則。
+# 作用 (Role)：確保團隊開發中，所有程式碼都符合一致的品質與風格規範，並能即時發現語法、邏輯或效能隱憂。
+# 格式與用法 (Format/Usage)：採用 YAML 格式。透過 include 指令引用基礎規範，並在 rules 區段啟用或禁用特定的 lint 選項。
 # =============================================================================
 
-# 激活 Flutter 官方推薦的 Lint 規則集，這是社群公認的最佳實踐基礎。
+# [引用基礎規範集]
+# 目的：繼承 Flutter 官方推薦的 Lint 規則集 (flutter_lints)。
+# 作用：為專案提供預設的最佳開發實踐規範。
 include: package:flutter_lints/flutter.yaml
 
+# [分析器進階設定]
+analyzer:
+  # 目的：排除特定檔案或目錄的檢查（例如由程式碼產生器產生的檔案）。
+  exclude:
+    - "**/*.g.dart"
+    - "build/**"
+
+# [程式碼風格規則 (Linter Rules)]
+# 目的：針對本專案的需求，定義或微調特定的風格規則。
+# 格式：鍵值對 (key: value)，value 為 true 或 false。
 linter:
-  # [Linter 規則自定義]
-  # 此區段可針對專案需求微調細項規則。
-  # 所有規則清單可參考: https://dart.dev/lints
   rules:
-    # avoid_print: false  # 若需要在正式版中保留 print 資訊，可將此設為 false
-    # prefer_single_quotes: true # 強制要求使用單引號字串，維持程式碼整潔
+    # 常用規則自定義：
+    # avoid_print: false       # 允許在除錯時使用 print
+    # prefer_single_quotes: true # 統一使用單引號字串，使程式碼更為整潔
+    # camel_case_types: true     # 強制類別名稱使用大駝峰命名法

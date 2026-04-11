@@ -226,8 +226,10 @@ class TaipeiGarbageService extends BaseGarbageService {
   Future<List<GarbageTruck>> fetchTrucks() async {
     try {
       final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      // 根據指南，必須加上 limit=20000 才能獲取完整資料
       final String requestUrl = '$apiUrl&limit=20000&_t=$timestamp';
-      final response = await _client.get(Uri.parse(requestUrl));
+      final response = await _client.get(Uri.parse(requestUrl)).timeout(const Duration(seconds: 15));
+      
       if (response.statusCode == 200) {
         return await compute(_parseTaipeiTrucksIsolate, _TaipeiParseInput(response.body));
       }
