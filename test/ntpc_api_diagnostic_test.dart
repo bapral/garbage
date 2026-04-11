@@ -1,10 +1,10 @@
-/// [整體程式說明]: 新北市垃圾車 API 整合診斷測試，驗證新北市政府開放資料 CSV API 的連線性、標頭格式以及資料內容的正確性。
-/// [執行順序說明]:
-/// 1. 向新北市表定路線 CSV API 發送請求（限制 10 筆資料）。
-/// 2. 驗證 HTTP 狀態碼並解析 CSV 內容。
-/// 3. 檢查 CSV 標頭是否包含關鍵欄位（如 lineid, latitude, longitude, time）。
-/// 4. 斷言首筆資料的欄位內容（如 LineID、座標、時間）是否符合預期格式。
-/// 5. 執行即時位置 CSV API 的診斷測試，輸出標頭與範例資料以供調試。
+/// - **測試目的**: 新北市垃圾車 API 整合診斷測試，驗證新北市政府開放資料 CSV API 的連線性、標頭格式以及資料內容的正確性。
+/// - **測試覆蓋**: 
+///   - 表定路線 CSV API 連線（HTTP 200）與內容解析。
+///   - CSV 標頭關鍵欄位（lineid, latitude, longitude, time）檢查。
+///   - 首筆資料格式（LineID、數字座標、時間字串）準確性驗證。
+///   - 即時位置 CSV API 連線與標頭範例輸出。
+/// - **測試執行順序**: 向新北市 API 發送請求並限制資料量 -> 驗證狀態碼並使用 CsvToListConverter 解析內容 -> 檢查標頭與首筆資料欄位 -> 執行即時位置 API 診斷並輸出調試資訊。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;

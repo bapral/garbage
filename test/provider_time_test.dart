@@ -1,10 +1,9 @@
-/// [整體程式說明]: predictedTrucksProvider 的時間切換邏輯測試，驗證當使用者手動設定 targetTime 時，系統是否能正確從即時模式切換到資料庫預測模式。
-/// [執行順序說明]:
-/// 1. 初始化測試環境與 ProviderContainer。
-/// 2. 使用 MockGarbageService 覆蓋 garbageServiceProvider 以提供受控的查詢結果。
-/// 3. 設定 targetTimeProvider 為特定時間（2026/04/06 20:30）。
-/// 4. 讀取 predictedTrucksProvider 並等待非同步結果。
-/// 5. 驗證回傳的垃圾車清單是否包含模擬的測試資料（如「中央八街」站點）。
+/// - **測試目的**: predictedTrucksProvider 的時間切換邏輯測試，驗證當使用者手動設定 targetTime 時，系統是否能正確從即時模式切換到資料庫預測模式。
+/// - **測試覆蓋**: 
+///   - 手動設定 targetTime 觸發 Provider 切換至資料庫搜尋。
+///   - 模擬服務（MockGarbageService）的特定時分查詢結果驗證。
+///   - 預期回傳點位（如「中央八街」）的屬性檢查。
+/// - **測試執行順序**: 初始化測試環境與 ProviderContainer -> 使用 MockGarbageService 覆蓋服務提供者 -> 設定 targetTimeProvider 為特定預定時間 -> 讀取 predictedTrucksProvider 並驗證回傳內容。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

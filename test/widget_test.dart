@@ -1,9 +1,9 @@
-/// [整體程式說明]: 基本啟動冒煙測試：驗證 App 啟動後地圖畫面是否正常載入並顯示預設的新北市文字。
-/// [執行順序說明]:
-/// 1. 使用 MockTrucksNotifier 覆蓋 Provider 以模擬空的垃圾車清單。
-/// 2. 啟動 MapScreen 並建構 Widget 樹。
-/// 3. 等待非同步初始化與動畫完成。
-/// 4. 驗證畫面中是否包含預設城市名稱（新北市）的文字。
+/// - **測試目的**: 基本啟動冒煙測試：驗證 App 啟動後地圖畫面是否正常載入並顯示預設的新北市文字。
+/// - **測試覆蓋**: 
+///   - App 啟動後的 Widget 樹建構。
+///   - 地圖螢幕（MapScreen）載入驗證。
+///   - 預設城市（新北市）名稱顯示。
+/// - **測試執行順序**: 使用 Mock 覆蓋 Provider 模擬空清單 -> 啟動 MapScreen -> 等待初始化與動畫完成 -> 驗證畫面文字內容。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

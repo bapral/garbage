@@ -1,9 +1,9 @@
-/// [整體程式說明]: 台中市垃圾車服務邏輯測試，驗證即時動態 API 解析、班表資料庫同步以及時間過濾邏輯的正確性。
-/// [執行順序說明]:
-/// 1. 初始化 sqflite_ffi 與 PackageInfo 模擬環境，並建立臨時測試目錄。
-/// 2. 測試動態解析：使用 ManualMockClient 注入台中市動態 JSON，驗證 fetchTrucks 是否能正確轉換為 GarbageTruck 物件（含座標與時間轉換）。
-/// 3. 測試班表同步：在臨時目錄建立模擬的班表 JSON 檔，呼叫 syncDataIfNeeded 並驗證資料庫總筆數，隨後執行時間預測查詢。
-/// 4. 測試時間過濾：插入測試點位，驗證 findTrucksByTime 是否嚴格遵循前後 20 分鐘的過濾規則。
+/// - **測試目的**: 台中市垃圾車服務邏輯測試，驗證即時動態 API 解析、班表資料庫同步以及時間過濾邏輯的正確性。
+/// - **測試覆蓋**: 
+///   - fetchTrucks 即時動態 API JSON 解析與座標時間轉換。
+///   - syncDataIfNeeded 本地 JSON 班表讀取、解析與資料庫同步。
+///   - findTrucksByTime 時間過濾規則（前後 20 分鐘）驗證。
+/// - **測試執行順序**: 初始化模擬環境與臨時測試目錄 -> 使用 ManualMockClient 注入模擬 JSON 執行動態解析測試 -> 在臨時目錄建立班表檔執行同步測試 -> 插入測試點位執行時間過濾邏輯測試。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;

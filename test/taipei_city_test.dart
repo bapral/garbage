@@ -1,10 +1,10 @@
-/// [整體程式說明]: 台北市整合與 Provider 測試：驗證城市切換邏輯及對應服務的提供，確保台北市配置正確載入。
-/// [執行順序說明]:
-/// 1. 建立 ProviderContainer。
-/// 2. 測試預設城市：驗證初始城市是否為新北市。
-/// 3. 測試城市切換：將城市切換至台北市並驗證 CityConfig 的標題、顏色與中心點座標。
-/// 4. 測試服務提供：驗證切換城市後 garbageServiceProvider 是否回傳正確的服務類別（TaipeiGarbageService 或 NtpcGarbageService）。
-/// 5. 驗證台北市 API URL 常數的正確性。
+/// - **測試目的**: 台北市整合與 Provider 測試：驗證城市切換邏輯及對應服務的提供，確保台北市配置正確載入。
+/// - **測試覆蓋**: 
+///   - 預設城市（新北市）驗證。
+///   - 城市切換（至台北市）後 CityConfig（標題、顏色、中心點）更新驗證。
+///   - garbageServiceProvider 依據城市回傳正確服務類別（Taipei/Ntpc）。
+///   - 台北市 API URL 常數正確性檢查。
+/// - **測試執行順序**: 建立 ProviderContainer -> 驗證初始城市 -> 執行城市切換並讀取配置 -> 讀取服務提供者並驗證實例類別。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

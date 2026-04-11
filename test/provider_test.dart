@@ -1,9 +1,9 @@
-/// [整體程式說明]: Provider 單元測試，專注於驗證 predictedTrucksProvider 的資料來源切換邏輯（即時資料優先，無資料時退回到資料庫搜尋）。
-/// [執行順序說明]:
-/// 1. 建立 ProviderContainer 並使用 Mock 覆蓋 garbageTrucksProvider 以提供模擬的即時垃圾車資料。
-/// 2. 讀取 predictedTrucksProvider 並驗證其回傳的資料與模擬內容一致。
-/// 3. 建立另一個測試案例，模擬即時資料為空的情況。
-/// 4. 驗證 Provider 是否正確觸發資料庫搜尋邏輯（在測試環境中預期回傳 0 筆）。
+/// - **測試目的**: Provider 單元測試，專注於驗證 predictedTrucksProvider 的資料來源切換邏輯（即時資料優先，無資料時退回到資料庫搜尋）。
+/// - **測試覆蓋**: 
+///   - 即時垃圾車資料優先回傳驗證。
+///   - 即時資料為空時退回到資料庫模式的邏輯驗證。
+///   - 模擬 Notifier 的資料注入與處理。
+/// - **測試執行順序**: 建立 ProviderContainer 並使用 Mock 覆蓋 garbageTrucksProvider -> 讀取 predictedTrucksProvider 並等待非同步結果 -> 驗證回傳的資料筆數與座標是否與模擬內容一致。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

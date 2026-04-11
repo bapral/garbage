@@ -1,9 +1,10 @@
-/// [整體程式說明]: 驗證應用程式啟動流程，確保 UI 組件正確載入、主題設定正確，以及地圖螢幕能正常顯示。
-/// [執行順序說明]:
-/// 1. 使用 Mock 覆蓋 Provider 以避免真實網路請求。
-/// 2. 啟動 GarbageMapApp 並建構 Widget 樹。
-/// 3. 驗證 MaterialApp 的標題、屬性與首頁類型。
-/// 4. 等待非同步初始化完成並驗證地圖標題內容。
+/// - **測試目的**: 驗證應用程式啟動流程，確保 UI 組件正確載入、主題設定正確，以及地圖螢幕能正常顯示。
+/// - **測試覆蓋**: 
+///   - 啟動 GarbageMapApp 並驗證顯示 MapScreen。
+///   - 驗證 MaterialApp 的標題與屬性。
+///   - 驗證啟動時的主題色設定。
+///   - 預設城市（新北市）文字顯示驗證。
+/// - **測試執行順序**: 使用 Mock 覆蓋 Provider 以避免真實網路請求 -> 啟動應用程式並建構 Widget 樹 -> 驗證 MaterialApp 屬性與首頁類型 -> 等待非同步初始化完成並驗證地圖內容。
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

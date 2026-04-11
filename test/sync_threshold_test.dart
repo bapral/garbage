@@ -1,9 +1,9 @@
-/// [整體程式說明]: 資料同步門檻邏輯測試，驗證雙北市垃圾車服務在執行真實同步時，是否符合最小資料量限制（台北 > 1100 筆，新北 > 5000 筆）。
-/// [執行順序說明]:
-/// 1. 初始化 sqflite_ffi 與 PackageInfo 模擬環境。
-/// 2. 建立臨時目錄以存放同步過程中產生的暫存檔。
-/// 3. 測試台北市：呼叫 TaipeiGarbageService.syncDataIfNeeded，監控進度訊息並驗證資料庫總筆數是否符合 1100 筆門檻。
-/// 4. 測試新北市：呼叫 NtpcGarbageService.syncDataIfNeeded，驗證資料庫總筆數是否符合 5000 筆門檻。
+/// - **測試目的**: 資料同步門檻邏輯測試，驗證雙北市垃圾車服務在執行真實同步時，是否符合最小資料量限制（台北 > 1100 筆，新北 > 5000 筆）。
+/// - **測試覆蓋**: 
+///   - 台北市同步門檻驗證（> 1100 筆）。
+///   - 新北市同步門檻驗證（> 5000 筆）。
+///   - 同步進度訊息（onProgress）監控與輸出。
+/// - **測試執行順序**: 初始化模擬環境 -> 建立臨時暫存目錄 -> 呼叫雙北市服務的 syncDataIfNeeded 方法 -> 斷言資料庫總筆數是否符合各城市設定的門檻。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ntpc_garbage_map/services/taipei_garbage_service.dart';

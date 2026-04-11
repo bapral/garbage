@@ -1,10 +1,10 @@
-/// [整體程式說明]: 高雄市垃圾車服務深層整合測試，使用 Mock API 驗證完整的資料同步流程、時間查詢以及垃圾車點位抓取邏輯。
-/// [執行順序說明]:
-/// 1. 初始化記憶體資料庫並重置 DatabaseService 實例。
-/// 2. 使用 MockClient 注入模擬的高雄市多筆 API 回傳資料。
-/// 3. 執行 syncDataIfNeeded 同步方法並指定版本號。
-/// 4. 驗證資料庫中是否成功存入指定筆數的資料。
-/// 5. 模擬特定時間（19:30）執行查詢，驗證回傳的點位名稱與屬性是否正確。
+/// - **測試目的**: 高雄市垃圾車服務深層整合測試，使用 Mock API 驗證完整的資料同步流程、時間查詢以及垃圾車點位抓取邏輯。
+/// - **測試覆蓋**: 
+///   - Mock API 資料同步與資料庫存入驗證。
+///   - 資料庫總筆數斷言。
+///   - 19:30 點位名稱與屬性查詢準確性。
+///   - findTrucksByTime 服務層級 GarbageTruck 物件回傳驗證。
+/// - **測試執行順序**: 初始化記憶體資料庫並重置實例 -> 使用 MockClient 注入模擬的高雄市多筆 API 回傳資料 -> 執行 syncDataIfNeeded 同步方法 -> 驗證資料庫筆數與特定時間查詢結果。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ntpc_garbage_map/models/city_config.dart';

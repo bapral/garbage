@@ -1,9 +1,8 @@
-/// [整體程式說明]: 時間範圍邏輯測試，用於驗證 DatabaseService 內部搜尋點位時的時間偏移視窗是否符合預期。
-/// [執行順序說明]:
-/// 1. 初始化 sqflite_ffi 並設定記憶體資料庫。
-/// 2. 重置 DatabaseService 實例。
-/// 3. 測試預測模式的時間範圍：驗證搜尋邏輯是否正確覆蓋搜尋時間前後的特定分鐘區間（如 20 或 30 分鐘）。
-/// 4. 透過觀察 DatabaseService 的行為來反向驗證私有的時間偏移設定。
+/// - **測試目的**: 時間範圍邏輯測試，用於驗證 DatabaseService 內部搜尋點位時的時間偏移視窗是否符合預期。
+/// - **測試覆蓋**: 
+///   - 預測模式下查詢資料庫的時間視窗寬度（如 20 分鐘）。
+///   - 搜尋時間偏移區間（-10 至 +20）的邏輯正確性。
+/// - **測試執行順序**: 初始化 sqflite_ffi 並設定記憶體資料庫 -> 重置 DatabaseService 實例並觸發初始化 -> 透過反向驗證或日誌檢查時間偏移視窗設定。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ntpc_garbage_map/services/database_service.dart';

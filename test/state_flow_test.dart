@@ -1,10 +1,9 @@
-/// [整體程式說明]: 狀態流變遷測試，驗證應用程式在執行資料同步時，isSyncingProvider 的狀態是否能正確經歷「同步中」到「同步完成」的轉變。
-/// [執行順序說明]:
-/// 1. 初始化 PackageInfo 模擬值。
-/// 2. 使用 MockSyncService 覆蓋服務提供者以模擬受控的同步延遲。
-/// 3. 建立 ProviderContainer 並同時監聽 garbageTrucksProvider 與 isSyncingProvider。
-/// 4. 進入輪詢迴圈，等待並驗證 isSyncingProvider 的值從 true 變更為 false。
-/// 5. 確保同步狀態在 1 秒內正確轉換，否則測試失敗。
+/// - **測試目的**: 狀態流變遷測試，驗證應用程式在執行資料同步時，isSyncingProvider 的狀態是否能正確經歷「同步中」到「同步完成」的轉變。
+/// - **測試覆蓋**: 
+///   - isSyncing 狀態從 true (同步開始) 到 false (同步結束) 的轉換路徑。
+///   - MockSyncService 的同步延遲與回調觸發。
+///   - Provider 監聽器對狀態變遷的捕捉。
+/// - **測試執行順序**: 初始化模擬環境與 Mock 同步服務 -> 建立 ProviderContainer 並監聽相關 Provider -> 啟動同步流程並進入輪詢等待狀態 -> 驗證 isSyncingProvider 在 1 秒內正確變更為 false。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

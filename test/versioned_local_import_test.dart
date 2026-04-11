@@ -1,10 +1,9 @@
-/// [整體程式說明]: 版本化本地匯入與 UI 測試：驗證資料同步的跳過機制、版本檢查以及地圖 AppBar 與詳細資訊卡的顯示。
-/// [執行順序說明]:
-/// 1. 初始化 sqflite_ffi 並設定 PackageInfo 模擬值。
-/// 2. 建立臨時目錄並寫入測試用的 CSV 班表。
-/// 3. 測試 syncDataIfNeeded：驗證首次同步成功匯入，且第二次同步因版本一致而正確跳過。
-/// 4. 測試 UI 組件：啟動 MapScreen 並驗證 AppBar 是否正確顯示快取紀錄數量。
-/// 5. 測試 BottomSheet：點擊垃圾車標記並驗證資訊卡中是否包含可選取的車號文字（SelectableText）。
+/// - **測試目的**: 版本化本地匯入與 UI 測試：驗證資料同步的跳過機制、版本檢查以及地圖 AppBar 與詳細資訊卡的顯示。
+/// - **測試覆蓋**: 
+///   - 資料同步跳過機制（版本一致時不重複匯入）。
+///   - AppBar 顯示快取紀錄數量驗證。
+///   - BottomSheet 中 SelectableText 組件使用驗證。
+/// - **測試執行順序**: 初始化 sqflite_ffi 並設定臨時目錄與 CSV -> 執行首次與重複同步測試筆數 -> 啟動 MapScreen 並驗證快取文字 -> 點擊標記驗證資訊卡文字類型。
 
 import 'dart:io';
 import 'package:flutter/material.dart';

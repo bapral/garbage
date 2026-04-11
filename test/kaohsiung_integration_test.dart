@@ -1,10 +1,9 @@
-/// [整體程式說明]: 高雄市垃圾車 Provider 整合測試，驗證城市切換邏輯、配置更新以及非同步同步機制的穩定性。
-/// [執行順序說明]:
-/// 1. 初始化記憶體資料庫與模擬 PackageInfo。
-/// 2. 建立 ProviderContainer 並讀取初始狀態（預設應為新北市）。
-/// 3. 透過 citySelectionProvider 切換至高雄市。
-/// 4. 驗證 currentCityConfigProvider 是否正確更新為高雄市的配置（如標題、中心座標）。
-/// 5. 觸發 garbageTrucksProvider 並驗證其在同步過程中的行為，確保不會發生崩潰。
+/// - **測試目的**: 高雄市垃圾車 Provider 整合測試，驗證城市切換邏輯、配置更新以及非同步同步機制的穩定性。
+/// - **測試覆蓋**: 
+///   - 城市選擇切換（從新北至高雄）功能。
+///   - 高雄市 CityConfig（標題、初始座標）正確性。
+///   - 非同步資料同步觸發與網路異常下的穩定性。
+/// - **測試執行順序**: 初始化記憶體資料庫與模擬 PackageInfo -> 建立 ProviderContainer 並切換城市至高雄市 -> 驗證 currentCityConfigProvider 更新結果 -> 觸發 garbageTrucksProvider 並監控同步行為。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

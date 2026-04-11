@@ -1,9 +1,9 @@
-/// [整體程式說明]: 核心邏輯與資料庫綜合單元測試，驗證垃圾車位置預測演算法、資料庫版本控制以及基於時間的點位查詢功能。
-/// [執行順序說明]:
-/// 1. 初始化記憶體資料庫環境。
-/// 2. 測試 GarbageTruck.predictOnRoute 函式，驗證其在給定路線上計算未來位置的準確性。
-/// 3. 驗證 DatabaseService 的版本資訊儲存與讀取邏輯。
-/// 4. 測試 findPointsByTime 查詢，驗證其是否能正確處理 15 分鐘的時間偏移視窗。
+/// - **測試目的**: 核心邏輯與資料庫綜合單元測試，驗證垃圾車位置預測演算法、資料庫版本控制以及基於時間的點位查詢功能。
+/// - **測試覆蓋**: 
+///   - GarbageTruck.predictOnRoute 預測演算法準確性驗證。
+///   - DatabaseService 資料庫版本資訊儲存與讀取邏輯。
+///   - findPointsByTime 15 分鐘時間偏移視窗查詢。
+/// - **測試執行順序**: 初始化記憶體資料庫環境 -> 執行各項核心邏輯測試（預測、版本、查詢） -> 驗證計算結果或資料庫狀態是否符合預期。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:latlong2/latlong.dart';
