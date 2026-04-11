@@ -2,30 +2,49 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- 
+		目的：macOS 應用程式的屬性清單 (Property List)
+		作用：定義 macOS 桌面應用的元數據，包括版權聲明、執行檔名稱、應用程式識別碼、最低 macOS 系統版本要求及主介面 Nib 檔案配置。
+		格式與用法：XML 格式。開發者可在此處設定應用圖示檔案或調整系統最低版本要求。
+	-->
+
+	<!-- 開發語言區域 -->
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<!-- 可執行檔名 -->
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
+	<!-- 應用程式圖示檔案路徑 -->
 	<key>CFBundleIconFile</key>
 	<string></string>
+	<!-- 應用唯一識別碼 (Bundle Identifier) -->
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<!-- Info.plist 版本 -->
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<!-- 產品名稱 -->
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<!-- 包類型 (APPL 代表應用程式) -->
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- 顯示版本號 (Short Version String) -->
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
+	<!-- 內部組建版本號 (Build Number) -->
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<!-- 最低 macOS 部署目標版本 -->
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+	<!-- 人類可讀的版權聲明 -->
 	<key>NSHumanReadableCopyright</key>
 	<string>$(PRODUCT_COPYRIGHT)</string>
+	<!-- 主視窗 Nib 檔案名稱 (通常是 MainMenu) -->
 	<key>NSMainNibFile</key>
 	<string>MainMenu</string>
+	<!-- 應用的主要類別名稱 (通常為 NSApplication) -->
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 </dict>

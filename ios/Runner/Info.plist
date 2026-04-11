@@ -2,7 +2,13 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!-- 是否禁用手機上的最小幀時長限制（用於高刷新率屏幕） -->
+	<!-- 
+		目的：iOS 應用程式的屬性清單 (Property List)
+		作用：定義應用程式的元數據，如顯示名稱、版本、包名 (Bundle ID)、系統權限申請說明（如位置權限）及支援的螢幕方向。
+		格式與用法：XML 格式。在新增需要原生權限的插件後，必須在此處添加對應的權限說明字串。
+	-->
+
+	<!-- 是否停用手機上的最小偵間隔限制（用於支援 120Hz 高刷新率螢幕） -->
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<!-- 開發語言區域 -->
@@ -11,86 +17,62 @@
 	<!-- 應用顯示名稱 -->
 	<key>CFBundleDisplayName</key>
 	<string>Ntpc Garbage Map</string>
-	<!-- 可執行文件名 -->
+	<!-- 可執行檔名 -->
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
-	<!-- 應用唯一標識符 -->
+	<!-- 應用唯一識別碼 (Bundle Identifier) -->
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<!-- Info.plist 版本 -->
+	<!-- Info.plist 字典版本 -->
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
-	<!-- 項目名稱 -->
+	<!-- 專案名稱 -->
 	<key>CFBundleName</key>
 	<string>ntpc_garbage_map</string>
-	<!-- 包類型（APPL 代表應用程序） -->
+	<!-- 包類型 (APPL 代表應用程式) -->
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
-	<!-- 應用版本號（顯示給用戶看） -->
+	<!-- 應用的版本號碼（顯示給用戶看，通常對應 pubspec.yaml 的 version 前半部） -->
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
-	<!-- 簽名標識 -->
+	<!-- 簽署標識符 -->
 	<key>CFBundleSignature</key>
 	<string>????</string>
-	<!-- 內部版本代碼（用於商店更新） -->
+	<!-- 內部版本代碼（用於商店更新，對應 pubspec.yaml 的 build number） -->
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
-	<!-- 是否要求 iOS 系統 -->
+	<!-- 是否要求在 iOS 系統上執行 -->
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- 使用中定位權限說明 -->
+	<!-- 「使用中」定位權限說明：向用戶解釋為什麼需要定位 -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>我們需要您的位置來顯示您附近的垃圾車。</string>
-	<!-- 始終定位權限說明（如果需要後台定位） -->
+	<!-- 「始終」定位權限說明（如需背景定位時使用） -->
 	<key>NSLocationAlwaysUsageDescription</key>
 	<string>我們需要您的位置來提供即時的垃圾車靠近通知。</string>
-	<!-- 網絡安全配置，允許加載 HTTP 資源（謹慎使用） -->
+	<!-- 網路安全配置：允許載入非 HTTPS 的資源 -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<!-- 是否支持間接輸入事件（如鼠標、觸控板） -->
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-
-	<dict>
-		<!-- 是否支持多場景 -->
-		<key>UIApplicationSupportsMultipleScenes</key>
-		<false/>
-		<!-- 場景配置 -->
-		<key>UISceneConfigurations</key>
-		<dict>
-			<key>UIWindowSceneSessionRoleApplication</key>
-			<array>
-				<dict>
-					<key>UISceneClassName</key>
-					<string>UIWindowScene</string>
-					<key>UISceneConfigurationName</key>
-					<string>flutter</string>
-					<key>UISceneDelegateClassName</key>
-					<string>$(PRODUCT_MODULE_NAME).SceneDelegate</string>
-					<key>UISceneStoryboardFile</key>
-					<string>Main</string>
-				</dict>
-			</array>
-		</dict>
-	</dict>
+	<!-- 是否支援間接輸入裝置（如滑鼠、觸控板） -->
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<!-- 啟動界面 Storyboard 名稱 -->
+	<!-- 啟動畫面 Storyboard 名稱 -->
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
-	<!-- 主界面 Storyboard 文件名 -->
+	<!-- 主介面 Storyboard 檔案名稱 -->
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
-	<!-- 支持的屏幕方向（手機） -->
+	<!-- 支援的螢幕方向（手機） -->
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<!-- 支持的屏幕方向（iPad） -->
+	<!-- 支援的螢幕方向（iPad） -->
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
